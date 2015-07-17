@@ -6,6 +6,7 @@
     <groupId>org.sagebionetworks</groupId>
     <artifactId>BridgeUserDataDownloadService</artifactId>
     <version>1.0</version>
+    <packaging>war</packaging>
 
     <properties>
         <java.version>1.8</java.version>
