@@ -2,6 +2,7 @@ language: java
 jdk:
 - oraclejdk8
 sudo: false
+before_deploy: mvn package
 deploy:
   provider: elasticbeanstalk
   access_key_id:
@@ -13,3 +14,4 @@ deploy:
   env:
     develop: Bridge-UDD-prod
   bucket_name: elasticbeanstalk-us-east-1-649232250620
+  zip-file: target/BridgeUserDataDownloadService-1.0.war
