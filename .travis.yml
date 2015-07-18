@@ -12,3 +12,4 @@ deploy:
   app: BridgeUserDataDownloadService
   env:
     develop: Bridge-UDD-prod
+  bucket_name: elasticbeanstalk-us-east-1-649232250620
