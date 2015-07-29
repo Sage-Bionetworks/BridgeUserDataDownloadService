@@ -13,6 +13,6 @@ deploy:
   region: us-east-1
   app: BridgeUserDataDownloadService
   env:
-    develop: Bridge-UDD-prod
+    develop: Bridge-UDD-Worker-Prod
   bucket_name: elasticbeanstalk-us-east-1-649232250620
   zip-file: target/BridgeUserDataDownloadService-1.0.war
