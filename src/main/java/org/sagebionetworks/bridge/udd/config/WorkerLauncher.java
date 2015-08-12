@@ -1,4 +1,4 @@
-package org.sagebionetworks.bridge.udd;
+package org.sagebionetworks.bridge.udd.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+
+import org.sagebionetworks.bridge.udd.worker.BridgeUddWorker;
 
 @Component
 public class WorkerLauncher implements CommandLineRunner {

@@ -1,4 +1,4 @@
-package org.sagebionetworks.bridge.udd;
+package org.sagebionetworks.bridge.udd.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

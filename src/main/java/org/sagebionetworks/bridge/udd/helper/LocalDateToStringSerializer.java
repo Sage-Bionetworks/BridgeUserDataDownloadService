@@ -1,4 +1,4 @@
-package org.sagebionetworks.bridge.udd;
+package org.sagebionetworks.bridge.udd.helper;
 
 import java.io.IOException;
 
@@ -12,6 +12,7 @@ import org.joda.time.format.ISODateTimeFormat;
  * Custom serializer for Joda LocalDate, because the one in jackson-datatype-joda serializes to a weird format. This
  * one serializes to a string in a simple YYYY-MM-DD format.
  */
+// TODO: This is copy-pasted from BridgePF. We should refactor this into a common shared lib
 public class LocalDateToStringSerializer extends JsonSerializer<LocalDate> {
     /** {@inheritDoc} */
     @Override

@@ -1,9 +1,8 @@
-package org.sagebionetworks.bridge.udd;
+package org.sagebionetworks.bridge.udd.helper;
 
 import java.util.List;
 
 import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.ReceiveMessageResult;
