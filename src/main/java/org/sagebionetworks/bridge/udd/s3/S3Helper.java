@@ -1,4 +1,4 @@
-package org.sagebionetworks.bridge.udd.helper;
+package org.sagebionetworks.bridge.udd.s3;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,6 +23,11 @@ public class S3Helper {
      */
     public void setS3Client(AmazonS3Client s3Client) {
         this.s3Client = s3Client;
+    }
+
+    /** Convenience method, if consuming classes need to use the S3 client directly for whatever reason. */
+    public AmazonS3Client getS3Client() {
+        return s3Client;
     }
 
     /**

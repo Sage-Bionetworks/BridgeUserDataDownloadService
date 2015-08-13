@@ -1,10 +1,8 @@
 package org.sagebionetworks.bridge.udd.worker;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.amazonaws.services.sqs.model.Message;
-import com.google.common.base.Joiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,9 +14,12 @@ import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
+import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
+import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.helper.WorkerLoopManager;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
+import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
+import org.sagebionetworks.bridge.udd.s3.S3Packager;
 import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
 @Component
@@ -28,6 +29,8 @@ public class BridgeUddWorker implements Runnable {
 
     private DynamoHelper dynamoHelper;
     private WorkerLoopManager loopManager;
+    private S3Packager s3Packager;
+    private SesHelper sesHelper;
     private SqsHelper sqsHelper;
     private StormpathHelper stormpathHelper;
 
@@ -39,6 +42,16 @@ public class BridgeUddWorker implements Runnable {
     @Autowired
     public final void setLoopManager(WorkerLoopManager loopManager) {
         this.loopManager = loopManager;
+    }
+
+    @Autowired
+    public final void setS3Packager(S3Packager s3Packager) {
+        this.s3Packager = s3Packager;
+    }
+
+    @Autowired
+    public void setSesHelper(SesHelper sesHelper) {
+        this.sesHelper = sesHelper;
     }
 
     @Autowired
@@ -76,18 +89,17 @@ public class BridgeUddWorker implements Runnable {
                 BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(sqsMessageText,
                         BridgeUddRequest.class);
 
+                // This sequence of helpers does the following:
+                //  * get the study from DDB (because accounts are partitioned on Study)
+                //  * get the account from Stormpath
+                //  * get the upload metadata from DDB
+                //  * download the uploads, zip then, and write them back to S3
+                //  * email the S3 link to the user
                 StudyInfo studyInfo = dynamoHelper.getStudy(request.getStudyId());
                 AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, request.getUsername());
                 List<UploadInfo> uploadInfoList = dynamoHelper.getUploadsForRequest(accountInfo, request);
-
-                // debug log
-                List<String> uploadIdList = new ArrayList<>();
-                for (UploadInfo oneUploadInfo : uploadInfoList) {
-                    uploadIdList.add(oneUploadInfo.getId());
-                }
-                LOG.info("Found upload IDs: " + Joiner.on(", ").join(uploadIdList));
-
-                // TODO: download from S3, package, upload back to S3, and send email
+                PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
+                sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
 
                 // We're done processing the SQS message. Delete it so it doesn't get duped.
                 sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());

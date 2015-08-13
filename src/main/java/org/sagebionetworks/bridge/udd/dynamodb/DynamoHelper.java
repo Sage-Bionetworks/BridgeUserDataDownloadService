@@ -37,8 +37,13 @@ public class DynamoHelper {
 
     public StudyInfo getStudy(String studyId) {
         Item study = ddbStudyTable.getItem("identifier", studyId);
-        return new StudyInfo.Builder().withStudyId(studyId).withStormpathHref(study.getString("stormpathHref"))
-                .build();
+
+        String studyName = study.getString("name");
+        String stormpathHref = study.getString("stormpathHref");
+        String supportEmail = study.getString("supportEmail");
+
+        return new StudyInfo.Builder().withName(studyName).withStudyId(studyId).withStormpathHref(stormpathHref)
+                .withSupportEmail(supportEmail).build();
     }
 
     public List<UploadInfo> getUploadsForRequest(AccountInfo accountInfo, BridgeUddRequest request) {

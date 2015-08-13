@@ -9,7 +9,7 @@ import com.google.common.cache.CacheLoader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.helper.S3Helper;
+import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
 /**
  * This is the cache loader that supports loading CMS encryptors on demand, keyed by the study ID. If the study's
@@ -23,7 +23,7 @@ public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor>
 
     // TODO: move these to configs
     private static final String CERT_BUCKET = "org-sagebridge-upload-cms-cert-local";
-    private static final String PRIV_KEY_BUCKET = "org-sagebridge-upload-cms-priv-uat";
+    private static final String PRIV_KEY_BUCKET = "org-sagebridge-upload-cms-priv-local";
 
     private S3Helper s3Helper;
 

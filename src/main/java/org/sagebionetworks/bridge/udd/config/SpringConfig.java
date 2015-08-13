@@ -8,6 +8,7 @@ import com.amazonaws.services.dynamodbv2.document.DynamoDB;
 import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.cache.CacheBuilder;
@@ -24,7 +25,7 @@ import org.springframework.context.annotation.Configuration;
 import org.sagebionetworks.bridge.udd.crypto.AesGcmEncryptor;
 import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
 import org.sagebionetworks.bridge.udd.crypto.CmsEncryptorCacheLoader;
-import org.sagebionetworks.bridge.udd.helper.S3Helper;
+import org.sagebionetworks.bridge.udd.s3.S3Helper;
 import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
@@ -93,6 +94,11 @@ public class SpringConfig {
         S3Helper s3Helper = new S3Helper();
         s3Helper.setS3Client(s3Client());
         return s3Helper;
+    }
+
+    @Bean
+    public AmazonSimpleEmailServiceClient sesClient() {
+        return new AmazonSimpleEmailServiceClient();
     }
 
     @Bean
