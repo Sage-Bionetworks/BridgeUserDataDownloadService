@@ -1,7 +1,6 @@
 package org.sagebionetworks.bridge.udd.accounts;
 
 import java.util.Iterator;
-
 import javax.annotation.Resource;
 
 import com.stormpath.sdk.account.Account;

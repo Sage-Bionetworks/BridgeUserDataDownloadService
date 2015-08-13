@@ -1,7 +1,5 @@
 package org.sagebionetworks.bridge.udd.helper;
 
-import java.net.URL;
-
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
 import com.amazonaws.services.simpleemail.model.Body;
 import com.amazonaws.services.simpleemail.model.Content;
