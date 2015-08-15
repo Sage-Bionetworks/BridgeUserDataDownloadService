@@ -23,6 +23,7 @@ public class SqsHelper {
     @Autowired
     public void setEnvConfig(EnvironmentConfig envConfig) {
         this.envConfig = envConfig;
+        LOG.info("Configured SQS queue: " + envConfig.getProperty("sqs.queue.url"));
     }
 
     @Autowired
