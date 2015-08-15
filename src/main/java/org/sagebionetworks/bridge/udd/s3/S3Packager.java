@@ -13,6 +13,8 @@ import java.util.zip.ZipOutputStream;
 import javax.annotation.Resource;
 
 import com.amazonaws.HttpMethod;
+import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.Files;
 import org.joda.time.DateTime;
@@ -23,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
@@ -31,17 +34,24 @@ import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 public class S3Packager {
     private static final Logger LOG = LoggerFactory.getLogger(S3Packager.class);
 
-    // TODO: move bucket name and expiration period to configs
-    private static final String UPLOAD_BUCKET_NAME = "org-sagebridge-upload-dwaynejeng";
-    private static final String USERDATA_BUCKET_NAME = "org-sagebridge-userdata-dwaynejeng";
+    // TODO: move to configs
     private static final int URL_EXPIRATION_HOURS = 24;
 
+    private static final Joiner LINE_JOINER = Joiner.on('\n');
+    private static final int PROGRESS_INTERVAL = 100;
+
     private LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache;
+    private EnvironmentConfig envConfig;
     private S3Helper s3Helper;
 
     @Resource(name = "cmsEncryptorCache")
     public final void setCmsEncryptorCache(LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache) {
         this.cmsEncryptorCache = cmsEncryptorCache;
+    }
+
+    @Autowired
+    public void setEnvConfig(EnvironmentConfig envConfig) {
+        this.envConfig = envConfig;
     }
 
     @Autowired
@@ -53,8 +63,14 @@ public class S3Packager {
             throws IOException {
         // Download files into temp dir. Files will be named in the pattern "YYYY-MM-DD-[UploadId].zip". This will
         // allow users to organize their data by date.
+        int userHash = request.getUsername().hashCode();
+        int numUploads = uploadInfoList.size();
+        LOG.info("Downloading " + numUploads + " files from S3 for hash[username]=" + userHash);
+
         File tmpDir = Files.createTempDir();
         List<File> uploadFileList = new ArrayList<>();
+        List<String> errorList = new ArrayList<>();
+        int numDownloaded = 0;
         for (UploadInfo oneUploadInfo : uploadInfoList) {
             String uploadId = oneUploadInfo.getId();
             LocalDate uploadDate = oneUploadInfo.getUploadDate();
@@ -62,7 +78,8 @@ public class S3Packager {
 
             try {
                 // download and decrypt
-                byte[] encryptedUploadData = s3Helper.readS3FileAsBytes(UPLOAD_BUCKET_NAME, uploadId);
+                String uploadBucketName = envConfig.getProperty("upload.bucket");
+                byte[] encryptedUploadData = s3Helper.readS3FileAsBytes(uploadBucketName, uploadId);
                 BcCmsEncryptor encryptor = cmsEncryptorCache.get(request.getStudyId());
                 byte[] uploadData = encryptor.decrypt(encryptedUploadData);
 
@@ -72,9 +89,22 @@ public class S3Packager {
                 Files.write(uploadData, uploadFile);
                 uploadFileList.add(uploadFile);
             } catch (Exception ex) {
-                LOG.error("Error processing upload " + uploadId + ": " + ex.getMessage(), ex);
-                // TODO: write error file into the temp dir, so users know something went wrong
+                String errorMsg = "Error processing upload " + uploadId + ": " + ex.getMessage();
+                LOG.error(errorMsg, ex);
+                errorList.add(errorMsg);
             }
+
+            if (++numDownloaded % PROGRESS_INTERVAL == 0) {
+                LOG.info("Downloaded " + numDownloaded + " of " + numUploads + " for hash[username]=" + userHash);
+            }
+        }
+
+        // write errors into an error log file for the user
+        if (!errorList.isEmpty()) {
+            String errorLog = LINE_JOINER.join(errorList);
+            File errorLogFile = new File(tmpDir, "error.log");
+            Files.write(errorLog, errorLogFile, Charsets.UTF_8);
+            uploadFileList.add(errorLogFile);
         }
 
         // Zip up all upload files. Filename is "userdata-[startDate]-to-[endDate]-[random guid].zip". This allows the
@@ -85,24 +115,34 @@ public class S3Packager {
         String masterZipFilename = "userdata-" + startDateString + "-to-" + endDateString + "-" + randomGuid + ".zip";
         File masterZipFile = new File(tmpDir, masterZipFilename);
 
+        LOG.info("Compressing " + numUploads + " files for hash[username]=" + userHash);
         try (ZipOutputStream zipOutputStream = new ZipOutputStream(new BufferedOutputStream(
                 new FileOutputStream(masterZipFile)))) {
+            int numZipped = 0;
             for (File oneUploadFile : uploadFileList) {
                 ZipEntry oneZipEntry = new ZipEntry(oneUploadFile.getName());
                 zipOutputStream.putNextEntry(oneZipEntry);
                 Files.copy(oneUploadFile, zipOutputStream);
                 zipOutputStream.closeEntry();
-
                 oneUploadFile.delete();
+
+                if (++numZipped % PROGRESS_INTERVAL == 0) {
+                    LOG.info("Compressed " + numZipped + " of " + numUploads + " for hash[username]=" + userHash);
+                }
             }
         }
 
         // upload to S3
-        s3Helper.getS3Client().putObject(USERDATA_BUCKET_NAME, masterZipFilename, masterZipFile);
+        String userdataBucketName = envConfig.getProperty("userdata.bucket");
+        s3Helper.getS3Client().putObject(userdataBucketName, masterZipFilename, masterZipFile);
+
+        // cleanup
+        masterZipFile.delete();
+        tmpDir.delete();
 
         // Get pre-signed URL for download. This URL expires after a number of hours, defined by configuration.
         DateTime expirationTime = DateTime.now().plusHours(URL_EXPIRATION_HOURS);
-        URL presignedUrl = s3Helper.getS3Client().generatePresignedUrl(USERDATA_BUCKET_NAME, masterZipFilename,
+        URL presignedUrl = s3Helper.getS3Client().generatePresignedUrl(userdataBucketName, masterZipFilename,
                 expirationTime.toDate(), HttpMethod.GET);
         return new PresignedUrlInfo.Builder().withUrl(presignedUrl).withExpirationTime(expirationTime).build();
     }

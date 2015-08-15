@@ -3,6 +3,7 @@ package org.sagebionetworks.bridge.udd.worker;
 import java.util.List;
 
 import com.amazonaws.services.sqs.model.Message;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +89,11 @@ public class BridgeUddWorker implements Runnable {
                 String sqsMessageText = sqsMessage.getBody();
                 BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(sqsMessageText,
                         BridgeUddRequest.class);
+
+                String startDateStr = request.getStartDate().toString(ISODateTimeFormat.date());
+                String endDateStr = request.getEndDate().toString(ISODateTimeFormat.date());
+                LOG.info("Received request for hash[username]=" + request.getUsername().hashCode() + ", study=" +
+                        request.getStudyId() + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
 
                 // This sequence of helpers does the following:
                 //  * get the study from DDB (because accounts are partitioned on Study)

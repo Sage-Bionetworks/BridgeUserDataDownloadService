@@ -69,6 +69,7 @@ public class SesHelper {
         SendEmailRequest sendEmailRequest = new SendEmailRequest(fromAddress, destination, message);
         SendEmailResult sendEmailResult = sesClient.sendEmail(sendEmailRequest);
 
-        LOG.info("Sent email to SES with message ID " + sendEmailResult.getMessageId());
+        LOG.info("Sent email to hash[username]=" + accountInfo.getUsername().hashCode() + " with SES message ID " +
+                sendEmailResult.getMessageId());
     }
 }

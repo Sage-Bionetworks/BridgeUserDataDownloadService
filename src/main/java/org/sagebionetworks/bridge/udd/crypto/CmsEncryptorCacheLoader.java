@@ -9,6 +9,7 @@ import com.google.common.cache.CacheLoader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
 /**
@@ -21,11 +22,13 @@ import org.sagebionetworks.bridge.udd.s3.S3Helper;
 public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor> {
     private static final String PEM_FILENAME_FORMAT = "%s.pem";
 
-    // TODO: move these to configs
-    private static final String CERT_BUCKET = "org-sagebridge-upload-cms-cert-local";
-    private static final String PRIV_KEY_BUCKET = "org-sagebridge-upload-cms-priv-local";
-
+    private EnvironmentConfig envConfig;
     private S3Helper s3Helper;
+
+    @Autowired
+    public void setEnvConfig(EnvironmentConfig envConfig) {
+        this.envConfig = envConfig;
+    }
 
     /** S3 helper, configured by Spring. */
     @Autowired
@@ -36,14 +39,16 @@ public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor>
     /** {@inheritDoc} */
     @Override
     public BcCmsEncryptor load(String studyId) throws CertificateEncodingException, IOException {
+        String certBucket = envConfig.getProperty("upload.cms.cert.bucket");
+        String privKeyBucket = envConfig.getProperty("upload.cms.priv.bucket");
         String pemFileName = String.format(PEM_FILENAME_FORMAT, studyId);
 
         // download certificate
-        String certPem = s3Helper.readS3FileAsString(CERT_BUCKET, pemFileName);
+        String certPem = s3Helper.readS3FileAsString(certBucket, pemFileName);
         X509Certificate cert = PemUtils.loadCertificateFromPem(certPem);
 
         // download private key
-        String privKeyPem = s3Helper.readS3FileAsString(PRIV_KEY_BUCKET, pemFileName);
+        String privKeyPem = s3Helper.readS3FileAsString(privKeyBucket, pemFileName);
         PrivateKey privKey = PemUtils.loadPrivateKeyFromPem(privKeyPem);
 
         return new BcCmsEncryptor(cert, privKey);

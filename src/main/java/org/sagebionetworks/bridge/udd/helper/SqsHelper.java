@@ -11,15 +11,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
+
 @Component
 public class SqsHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SqsHelper.class);
 
-    // TODO move queue URL to configs
-    private static final String QUEUE_URL =
-            "https://sqs.us-east-1.amazonaws.com/649232250620/Bridge-UDD-Request-Queue";
-
+    private EnvironmentConfig envConfig;
     private AmazonSQSClient sqsClient;
+
+    @Autowired
+    public void setEnvConfig(EnvironmentConfig envConfig) {
+        this.envConfig = envConfig;
+    }
 
     @Autowired
     public void setSqsClient(AmazonSQSClient sqsClient) {
@@ -27,8 +31,9 @@ public class SqsHelper {
     }
 
     public Message poll() {
+        String queueUrl = envConfig.getProperty("sqs.queue.url");
         ReceiveMessageResult sqsResult = sqsClient.receiveMessage(new ReceiveMessageRequest()
-                .withQueueUrl(QUEUE_URL).withMaxNumberOfMessages(1).withWaitTimeSeconds(20));
+                .withQueueUrl(queueUrl).withMaxNumberOfMessages(1).withWaitTimeSeconds(20));
 
         List<Message> sqsMessageList = sqsResult.getMessages();
         int numMessages = sqsMessageList.size();
@@ -45,6 +50,7 @@ public class SqsHelper {
     }
 
     public void deleteMessage(String receiptHandle) {
-        sqsClient.deleteMessage(QUEUE_URL, receiptHandle);
+        String queueUrl = envConfig.getProperty("sqs.queue.url");
+        sqsClient.deleteMessage(queueUrl, receiptHandle);
     }
 }
