@@ -10,5 +10,5 @@
         <appender-ref ref="STDOUT" />
     </root>
 
-    <logger name="hello" level="INFO" />
+    <logger name="org.sagebionetworks.bridge.udd" level="INFO" />
 </configuration>
