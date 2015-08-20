@@ -1,32 +1,48 @@
 package org.sagebionetworks.bridge.udd.s3;
 
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.startsWith;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.google.common.base.Charsets;
 import com.google.common.cache.LoadingCache;
+import com.google.common.io.ByteStreams;
 import org.joda.time.DateTime;
+import org.joda.time.LocalDate;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
+import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
+import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 
 @SuppressWarnings("unchecked")
 public class S3PackagerTest {
@@ -168,6 +184,7 @@ public class S3PackagerTest {
 
         // mock date time helper - Instead of returning the real "now", return this fake "now"
         DateTime mockNow = DateTime.parse("2015-08-19T14:00:00-07:00");
+        long expectedExpirationDateMillis = mockNow.plusHours(S3Packager.URL_EXPIRATION_HOURS).getMillis();
         DateTimeHelper mockDateTimeHelper = mock(DateTimeHelper.class);
         when(mockDateTimeHelper.now()).thenReturn(mockNow);
 
@@ -189,6 +206,69 @@ public class S3PackagerTest {
             return mock(PutObjectResult.class);
         });
 
-        // TODO keep mocking S3 client and helper
+        ArgumentCaptor<Date> expirationDateS3ArgCaptor = ArgumentCaptor.forClass(Date.class);
+        when(mockS3Client.generatePresignedUrl(eq("dummy-userdata-bucket"),
+                startsWith("userdata-2015-08-15-to-2015-08-19-"), expirationDateS3ArgCaptor.capture(),
+                eq(HttpMethod.GET))).thenReturn(new URL("http://www.example.com/"));
+
+        // mock S3 helper - have the mock S3 file just return "[filename] encrypted data"
+        S3Helper mockS3Helper = mock(S3Helper.class);
+        when(mockS3Helper.getS3Client()).thenReturn(mockS3Client);
+        when(mockS3Helper.readS3FileAsBytes(eq("dummy-upload-bucket"), anyString())).thenAnswer(invocation -> {
+            String filename = invocation.getArgumentAt(1, String.class);
+            String fileDataStr = filename + " encrypted data";
+            return fileDataStr.getBytes(Charsets.UTF_8);
+        });
+
+        // set up test packager
+        S3Packager s3Packager = new S3Packager();
+        s3Packager.setCmsEncryptorCache(mockEncryptorCache);
+        s3Packager.setDateTimeHelper(mockDateTimeHelper);
+        s3Packager.setEnvConfig(mockEnvConfig);
+        s3Packager.setFileHelper(mockFileHelper);
+        s3Packager.setS3Helper(mockS3Helper);
+
+        // set up test inputs
+        BridgeUddRequest request = new BridgeUddRequest.Builder().withStudyId("test-study")
+                .withUsername("test-username").withStartDate(LocalDate.parse("2015-08-15"))
+                .withEndDate(LocalDate.parse("2015-08-19")).build();
+
+        List<UploadInfo> uploadInfoList = new ArrayList<>();
+        uploadInfoList.add(new UploadInfo.Builder().withId("foo-upload").withUploadDate("2015-08-15").build());
+        uploadInfoList.add(new UploadInfo.Builder().withId("bar-upload").withUploadDate("2015-08-17").build());
+        uploadInfoList.add(new UploadInfo.Builder().withId("baz-upload").withUploadDate("2015-08-19").build());
+
+        // execute
+        PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
+
+        // validate return value
+        assertEquals(presignedUrlInfo.getUrl().toString(), "http://www.example.com/");
+        assertEquals(presignedUrlInfo.getExpirationTime().getMillis(), expectedExpirationDateMillis);
+
+        // validate S3 args
+        Date expirationDateS3Arg = expirationDateS3ArgCaptor.getValue();
+        assertEquals(expirationDateS3Arg.getTime(), expectedExpirationDateMillis);
+
+        // validate S3 uploaded master zip file
+        byte[] masterZipBytes = masterZipBytesHolder[0];
+        Map<String, String> unzippedDataMap = new HashMap<>();
+        try (ByteArrayInputStream masterZipByteArrayInputStream = new ByteArrayInputStream(masterZipBytes);
+                ZipInputStream masterZipInputStream =
+                        new ZipInputStream(masterZipByteArrayInputStream, Charsets.UTF_8)) {
+            ZipEntry zipEntry;
+            while ((zipEntry = masterZipInputStream.getNextEntry()) != null) {
+                String zipEntryName = zipEntry.getName();
+                byte[] zipEntryData = ByteStreams.toByteArray(masterZipInputStream);
+                unzippedDataMap.put(zipEntryName, new String(zipEntryData, Charsets.UTF_8));
+            }
+        }
+
+        assertEquals(unzippedDataMap.size(), 3);
+        assertEquals(unzippedDataMap.get("2015-08-15-foo-upload.zip"), "foo-upload decrypted data");
+        assertEquals(unzippedDataMap.get("2015-08-17-bar-upload.zip"), "bar-upload decrypted data");
+        assertEquals(unzippedDataMap.get("2015-08-19-baz-upload.zip"), "baz-upload decrypted data");
+
+        // validate we deleted all temp files from the mock file system
+        assertTrue(mockFileHelper.isEmpty());
     }
 }

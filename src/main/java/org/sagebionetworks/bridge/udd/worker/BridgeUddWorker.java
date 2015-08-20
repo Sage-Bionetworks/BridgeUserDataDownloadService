@@ -1,9 +1,10 @@
 package org.sagebionetworks.bridge.udd.worker;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.amazonaws.services.sqs.model.Message;
-import org.joda.time.format.ISODateTimeFormat;
+import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,25 +91,32 @@ public class BridgeUddWorker implements Runnable {
                 BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(sqsMessageText,
                         BridgeUddRequest.class);
 
-                String startDateStr = request.getStartDate().toString(ISODateTimeFormat.date());
-                String endDateStr = request.getEndDate().toString(ISODateTimeFormat.date());
+                String startDateStr = request.getStartDate().toString();
+                String endDateStr = request.getEndDate().toString();
                 LOG.info("Received request for hash[username]=" + request.getUsername().hashCode() + ", study=" +
                         request.getStudyId() + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
 
-                // This sequence of helpers does the following:
-                //  * get the study from DDB (because accounts are partitioned on Study)
-                //  * get the account from Stormpath
-                //  * get the upload metadata from DDB
-                //  * download the uploads, zip then, and write them back to S3
-                //  * email the S3 link to the user
-                StudyInfo studyInfo = dynamoHelper.getStudy(request.getStudyId());
-                AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, request.getUsername());
-                List<UploadInfo> uploadInfoList = dynamoHelper.getUploadsForRequest(accountInfo, request);
-                PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
-                sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
+                Stopwatch requestStopwatch = Stopwatch.createStarted();
+                try {
+                    // This sequence of helpers does the following:
+                    //  * get the study from DDB (because accounts are partitioned on Study)
+                    //  * get the account from Stormpath
+                    //  * get the upload metadata from DDB
+                    //  * download the uploads, zip then, and write them back to S3
+                    //  * email the S3 link to the user
+                    StudyInfo studyInfo = dynamoHelper.getStudy(request.getStudyId());
+                    AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, request.getUsername());
+                    List<UploadInfo> uploadInfoList = dynamoHelper.getUploadsForRequest(accountInfo, request);
+                    PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
+                    sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
 
-                // We're done processing the SQS message. Delete it so it doesn't get duped.
-                sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());
+                    // We're done processing the SQS message. Delete it so it doesn't get duped.
+                    sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());
+                } finally {
+                    LOG.info("Request took " + requestStopwatch.elapsed(TimeUnit.SECONDS) +
+                            " seconds for hash[username]=" + request.getUsername().hashCode() + ", study=" +
+                            request.getStudyId() + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
+                }
             } catch (Exception ex) {
                 LOG.error("BridgeUddWorker exception: " + ex.getMessage(), ex);
             } catch (Error err) {

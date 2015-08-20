@@ -8,7 +8,6 @@ import com.amazonaws.services.simpleemail.model.Message;
 import com.amazonaws.services.simpleemail.model.SendEmailRequest;
 import com.amazonaws.services.simpleemail.model.SendEmailResult;
 import com.google.common.base.Strings;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,7 +71,7 @@ public class SesHelper {
 
         // body
         String presignedUrlStr = presignedUrlInfo.getUrl().toString();
-        String expirationTimeStr = presignedUrlInfo.getExpirationTime().toString(ISODateTimeFormat.dateTime());
+        String expirationTimeStr = presignedUrlInfo.getExpirationTime().toString();
         String bodyHtmlStr = String.format(BODY_TEMPLATE_HTML, presignedUrlStr, expirationTimeStr);
         String bodyTextStr = String.format(BODY_TEMPLATE_TEXT, presignedUrlStr, expirationTimeStr);
         Body body = new Body().withHtml(new Content(bodyHtmlStr)).withText(new Content(bodyTextStr));

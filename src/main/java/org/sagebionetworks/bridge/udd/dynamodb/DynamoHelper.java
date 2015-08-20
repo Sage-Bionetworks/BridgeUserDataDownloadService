@@ -8,7 +8,6 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.RangeKeyCondition;
 import com.amazonaws.services.dynamodbv2.document.Table;
-import org.joda.time.format.ISODateTimeFormat;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
@@ -67,8 +66,8 @@ public class DynamoHelper {
      * @return list of uploads matching the given account and request
      */
     public List<UploadInfo> getUploadsForRequest(AccountInfo accountInfo, BridgeUddRequest request) {
-        String startDateString = request.getStartDate().toString(ISODateTimeFormat.date());
-        String endDateString = request.getEndDate().toString(ISODateTimeFormat.date());
+        String startDateString = request.getStartDate().toString();
+        String endDateString = request.getEndDate().toString();
 
         // convert healthId to healthCode
         Item healthIdItem = ddbHealthIdTable.getItem("id", accountInfo.getHealthId());

@@ -12,11 +12,11 @@ import java.util.zip.ZipOutputStream;
 import javax.annotation.Resource;
 
 import com.amazonaws.HttpMethod;
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.cache.LoadingCache;
 import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +29,10 @@ import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 
+/**
+ * This class downloads the files from S3, decrypts them, packages them up into a master zip file, uploads it to S3,
+ * and generates and returns a pre-signed URL for that package.
+ */
 @Component
 public class S3Packager {
     private static final Logger LOG = LoggerFactory.getLogger(S3Packager.class);
@@ -50,31 +54,55 @@ public class S3Packager {
     private FileHelper fileHelper;
     private S3Helper s3Helper;
 
+    /**
+     * Encryptor cache. This creates (and cachces) the encryptor on-demand, keyed off study. This is used to decrypt
+     * files downloaded from S3.
+     */
     @Resource(name = "cmsEncryptorCache")
     public final void setCmsEncryptorCache(LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache) {
         this.cmsEncryptorCache = cmsEncryptorCache;
     }
 
+    /** Helper class to get "now". Used by unit tests to mock out "now" for deterministic tests". */
     @Autowired
     public final void setDateTimeHelper(DateTimeHelper dateTimeHelper) {
         this.dateTimeHelper = dateTimeHelper;
     }
 
+    /** Environment configs. Used to get the upload and user data S3 buckets. */
     @Autowired
     public final void setEnvConfig(EnvironmentConfig envConfig) {
         this.envConfig = envConfig;
     }
 
+    /**
+     * Wrapper class around the file system. Used by unit tests to test the functionality without hitting the real file
+     * system.
+     */
     @Autowired
     public final void setFileHelper(FileHelper fileHelper) {
         this.fileHelper = fileHelper;
     }
 
+    /** S3 helper. Used to download files from S3, upload files to S3, and generate pre-signed URLs. */
     @Autowired
     public final void setS3Helper(S3Helper s3Helper) {
         this.s3Helper = s3Helper;
     }
 
+    /**
+     * Given the Bridge-UDD request and the corresponding list of upload infos, generate the user data package. This
+     * entails downloading the files from S3, decrypting them, zipping them into a master zip file, uploading the
+     * master zip file to S3, and generating and returning a pre-signed URL.
+     *
+     * @param request
+     *         the Bridge User Data Download Service request
+     * @param uploadInfoList
+     *         list of upload infos, provided by the DynamoHelper
+     * @return pre-signed URL info, including the URL itself and its expiration date
+     * @throws IOException
+     *         if reading from or writing to the file system fails
+     */
     public PresignedUrlInfo packageFilesForUploadList(BridgeUddRequest request, List<UploadInfo> uploadInfoList)
             throws IOException {
         // Download files into temp dir. Files will be named in the pattern "YYYY-MM-DD-[UploadId].zip". This will
@@ -90,7 +118,7 @@ public class S3Packager {
         for (UploadInfo oneUploadInfo : uploadInfoList) {
             String uploadId = oneUploadInfo.getId();
             LocalDate uploadDate = oneUploadInfo.getUploadDate();
-            String uploadDateStr = uploadDate.toString(ISODateTimeFormat.date());
+            String uploadDateStr = uploadDate.toString();
 
             try {
                 // download and decrypt
@@ -125,15 +153,16 @@ public class S3Packager {
 
         // Zip up all upload files. Filename is "userdata-[startDate]-to-[endDate]-[random guid].zip". This allows the
         // filename to be unique, user-friendly, and contain no identifying info.
-        String startDateString = request.getStartDate().toString(ISODateTimeFormat.date());
-        String endDateString = request.getEndDate().toString(ISODateTimeFormat.date());
+        String startDateString = request.getStartDate().toString();
+        String endDateString = request.getEndDate().toString();
         String randomGuid = UUID.randomUUID().toString();
         String masterZipFilename = "userdata-" + startDateString + "-to-" + endDateString + "-" + randomGuid + ".zip";
         File masterZipFile = fileHelper.newFile(tmpDir, masterZipFilename);
 
         LOG.info("Compressing " + numUploads + " files for hash[username]=" + userHash);
-        try (ZipOutputStream zipOutputStream = new ZipOutputStream(new BufferedOutputStream(
-                fileHelper.getStream(masterZipFile)))) {
+        try (BufferedOutputStream masterZipBufferedOutputStream =
+                new BufferedOutputStream(fileHelper.getStream(masterZipFile));
+                ZipOutputStream zipOutputStream = new ZipOutputStream(masterZipBufferedOutputStream, Charsets.UTF_8)) {
             int numZipped = 0;
             for (File oneUploadFile : uploadFileList) {
                 ZipEntry oneZipEntry = new ZipEntry(oneUploadFile.getName());

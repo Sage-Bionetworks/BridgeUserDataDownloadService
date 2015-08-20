@@ -13,7 +13,6 @@ import com.amazonaws.services.simpleemail.model.Body;
 import com.amazonaws.services.simpleemail.model.SendEmailRequest;
 import com.amazonaws.services.simpleemail.model.SendEmailResult;
 import org.joda.time.DateTime;
-import org.joda.time.format.ISODateTimeFormat;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
@@ -41,7 +40,7 @@ public class SesHelperTest {
         // have the same formatting as the real code. Otherwise, predicting the formatting in the real email can get
         // kinda hairy.
         DateTime dummyExpirationDate = DateTime.parse("2015-08-22T14:00-07:00");
-        String dummyExpirationDateStr = dummyExpirationDate.toString(ISODateTimeFormat.dateTime());
+        String dummyExpirationDateStr = dummyExpirationDate.toString();
 
         StudyInfo studyInfo = new StudyInfo.Builder().withName("Test Study").withStudyId("test-study")
                 .withStormpathHref("dummy-stormpath-href").withSupportEmail("support@sagebase.org").build();
