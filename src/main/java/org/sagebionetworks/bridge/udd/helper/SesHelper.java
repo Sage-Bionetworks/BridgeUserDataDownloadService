@@ -18,6 +18,7 @@ import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 
+/** Helper class to format and send the presigned URL as an email through SES. */
 @Component
 public class SesHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SesHelper.class);
@@ -38,11 +39,23 @@ public class SesHelper {
 
     private AmazonSimpleEmailServiceClient sesClient;
 
+    /** SES client. */
     @Autowired
-    public void setSesClient(AmazonSimpleEmailServiceClient sesClient) {
+    public final void setSesClient(AmazonSimpleEmailServiceClient sesClient) {
         this.sesClient = sesClient;
     }
 
+    /**
+     * Sends the presigned URL to the specified account. This also uses the study info to construct the email message.
+     *
+     * @param studyInfo
+     *         study info, used to construct the email message, must be non-null
+     * @param presignedUrlInfo
+     *         presigned URL info (URL and expiration date), which should be sent to the specified account, must be
+     *         non-null
+     * @param accountInfo
+     *         account to send the presigned URL to, must be non-null
+     */
     public void sendPresignedUrlToAccount(StudyInfo studyInfo, PresignedUrlInfo presignedUrlInfo,
             AccountInfo accountInfo) {
         // from address
