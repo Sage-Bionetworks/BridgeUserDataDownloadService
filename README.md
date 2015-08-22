@@ -22,7 +22,7 @@ To run findbugs and get a friendly GUI to read about the bugs, run:
 mvn compile findbugs:findbugs findbugs:gui
 
 To run jacoco coverage reports and checks, run:
-mvn test jacoco:check
+mvn test jacoco:report jacoco:check
 
 Jacoco report will be in target/site/jacoco/index.html
 
