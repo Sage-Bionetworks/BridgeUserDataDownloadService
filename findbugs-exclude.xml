@@ -1,0 +1,9 @@
+<FindBugsFilter>
+    <Match>
+        <!--
+            This is copy-pasta that we plan on refactoring soon. Cleaning up the findbugs warning is pretty hairy. Not
+            worth doing right now, since we're going to refactor this shortly anyway.
+        -->
+        <Class name="org.sagebionetworks.bridge.udd.config.EnvironmentConfig" />
+    </Match>
+</FindBugsFilter>

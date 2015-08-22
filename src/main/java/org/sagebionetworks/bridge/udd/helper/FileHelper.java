@@ -24,13 +24,19 @@ public class FileHelper {
      * Delete the specified directory. This is used so that mock file systems can keep track of files. Even though
      * this is identical to deleteFile(), having a separate deleteDir() makes mocking and testing easier.
      */
-    public void deleteDir(File dir) {
-        dir.delete();
+    public void deleteDir(File dir) throws IOException {
+        boolean success = dir.delete();
+        if (!success) {
+            throw new IOException("Failed to delete directory: " + dir.getName());
+        }
     }
 
     /** Delete the specified file. This is used so that mock file systems can keep track of files. */
-    public void deleteFile(File file) {
-        file.delete();
+    public void deleteFile(File file) throws IOException {
+        boolean success = file.delete();
+        if (!success) {
+            throw new IOException("Failed to delete file: " + file.getName());
+        }
     }
 
     /** Non-static get stream. */

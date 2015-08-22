@@ -216,6 +216,12 @@ public class S3PackagerTest {
         when(mockS3Helper.getS3Client()).thenReturn(mockS3Client);
         when(mockS3Helper.readS3FileAsBytes(eq("dummy-upload-bucket"), anyString())).thenAnswer(invocation -> {
             String filename = invocation.getArgumentAt(1, String.class);
+
+            // To test the error case, if the filename is "exception-upload", throw an exception.
+            if ("exception-upload".equals(filename)) {
+                throw new IOException("test exception");
+            }
+
             String fileDataStr = filename + " encrypted data";
             return fileDataStr.getBytes(Charsets.UTF_8);
         });
@@ -235,6 +241,7 @@ public class S3PackagerTest {
 
         List<UploadInfo> uploadInfoList = new ArrayList<>();
         uploadInfoList.add(new UploadInfo.Builder().withId("foo-upload").withUploadDate("2015-08-15").build());
+        uploadInfoList.add(new UploadInfo.Builder().withId("exception-upload").withUploadDate("2015-08-16").build());
         uploadInfoList.add(new UploadInfo.Builder().withId("bar-upload").withUploadDate("2015-08-17").build());
         uploadInfoList.add(new UploadInfo.Builder().withId("baz-upload").withUploadDate("2015-08-19").build());
 
@@ -263,10 +270,14 @@ public class S3PackagerTest {
             }
         }
 
-        assertEquals(unzippedDataMap.size(), 3);
+        assertEquals(unzippedDataMap.size(), 4);
         assertEquals(unzippedDataMap.get("2015-08-15-foo-upload.zip"), "foo-upload decrypted data");
         assertEquals(unzippedDataMap.get("2015-08-17-bar-upload.zip"), "bar-upload decrypted data");
         assertEquals(unzippedDataMap.get("2015-08-19-baz-upload.zip"), "baz-upload decrypted data");
+
+        // We don't want the test to depend on the exact error message. Just test that it contains the upload ID, which
+        // is "exception-upload".
+        assertTrue(unzippedDataMap.get("error.log").contains("exception-upload"));
 
         // validate we deleted all temp files from the mock file system
         assertTrue(mockFileHelper.isEmpty());

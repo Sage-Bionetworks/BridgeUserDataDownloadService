@@ -12,7 +12,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 // TODO: This is copy-pasted from BridgePF. Refactor this into a shared library.
 public class AesGcmEncryptor {
-    public static final Integer VERSION = new Integer(2);
+    public static final Integer VERSION = 2;
 
     AesGcmEncryptor() {
         aesCipher = createCipher();

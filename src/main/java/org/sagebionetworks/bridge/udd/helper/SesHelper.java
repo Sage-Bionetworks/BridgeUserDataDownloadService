@@ -25,15 +25,15 @@ public class SesHelper {
     // TODO: move these to config
     private static final String DEFAULT_FROM_ADDRESS = "Bridge (Sage Bionetworks) <support@sagebridge.org>";
     private static final String SUBJECT_TEMPLATE = "Your requested data from %s";
-    private static final String BODY_TEMPLATE_HTML = "<html>\n" +
-            "   <body>\n" +
-            "       <p>To download your requested data, please click <a href=\"%s\">here</a>.</p>\n" +
-            "       <p>This link will expire on %s.</p>\n" +
-            "   </body>\n" +
+    private static final String BODY_TEMPLATE_HTML = "<html>%n" +
+            "   <body>%n" +
+            "       <p>To download your requested data, please click <a href=\"%s\">here</a>.</p>%n" +
+            "       <p>This link will expire on %s.</p>%n" +
+            "   </body>%n" +
             "</html>";
-    private static final String BODY_TEMPLATE_TEXT = "To download your requested data, please click on the following link:\n" +
-            "%s\n" +
-            "\n" +
+    private static final String BODY_TEMPLATE_TEXT = "To download your requested data, please click on the following link:%n" +
+            "%s%n" +
+            "%n" +
             "This link will expire on %s.";
 
     private AmazonSimpleEmailServiceClient sesClient;
