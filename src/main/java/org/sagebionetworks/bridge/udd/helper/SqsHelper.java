@@ -13,28 +13,41 @@ import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 
+/** Helper class to wrap polling SQS and deleting messages. */
 @Component
 public class SqsHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SqsHelper.class);
 
-    private EnvironmentConfig envConfig;
-    private AmazonSQSClient sqsClient;
+    // package-scoped to be available in unit tests
+    static final String CONFIG_KEY_SQS_QUEUE_URL = "sqs.queue.url";
 
+    private AmazonSQSClient sqsClient;
+    private String sqsQueueUrl;
+
+    /** Environment config, used to get SQS queue URL from configs. */
     @Autowired
-    public void setEnvConfig(EnvironmentConfig envConfig) {
-        this.envConfig = envConfig;
-        LOG.info("Configured SQS queue: " + envConfig.getProperty("sqs.queue.url"));
+    public final void setEnvConfig(EnvironmentConfig envConfig) {
+        this.sqsQueueUrl = envConfig.getProperty(CONFIG_KEY_SQS_QUEUE_URL);
+
+        // Unconventional, but super helpful in making sure we're configured properly
+        LOG.info("Configured SQS queue: " + sqsQueueUrl);
     }
 
+    /** SQS client. */
     @Autowired
-    public void setSqsClient(AmazonSQSClient sqsClient) {
+    public final void setSqsClient(AmazonSQSClient sqsClient) {
         this.sqsClient = sqsClient;
     }
 
+    /**
+     * Blocking call that polls SQS with a 20 second timeout. Returns at most 1 message. Returns null if no messages
+     * are available within that 20 second timeout.
+     *
+     * @return an SQS message, or null if no messages are available
+     */
     public Message poll() {
-        String queueUrl = envConfig.getProperty("sqs.queue.url");
         ReceiveMessageResult sqsResult = sqsClient.receiveMessage(new ReceiveMessageRequest()
-                .withQueueUrl(queueUrl).withMaxNumberOfMessages(1).withWaitTimeSeconds(20));
+                .withQueueUrl(sqsQueueUrl).withMaxNumberOfMessages(1).withWaitTimeSeconds(20));
 
         List<Message> sqsMessageList = sqsResult.getMessages();
         int numMessages = sqsMessageList.size();
@@ -50,8 +63,14 @@ public class SqsHelper {
         return sqsMessage;
     }
 
+    /**
+     * Deletes the message from SQS. Should only be called after processing is complete, to guarantee at-least-once
+     * semantics.
+     *
+     * @param receiptHandle
+     *         SQS message receipt handle
+     */
     public void deleteMessage(String receiptHandle) {
-        String queueUrl = envConfig.getProperty("sqs.queue.url");
-        sqsClient.deleteMessage(queueUrl, receiptHandle);
+        sqsClient.deleteMessage(sqsQueueUrl, receiptHandle);
     }
 }

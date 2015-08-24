@@ -21,7 +21,7 @@ public class S3Helper {
      * S3 Client. This is configured by Spring. We don't use the Autowired annotation because there are multiple S3
      * clients.
      */
-    public void setS3Client(AmazonS3Client s3Client) {
+    public final void setS3Client(AmazonS3Client s3Client) {
         this.s3Client = s3Client;
     }
 

@@ -9,17 +9,28 @@ import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.udd.worker.BridgeUddWorker;
 
+/**
+ * Launches worker threads. This hooks into the Spring Boot command-line runner, which is really just a big
+ * Runnable-equivalent that Spring Boot knows about.
+ */
 @Component
 public class WorkerLauncher implements CommandLineRunner {
     private static final Logger LOG = LoggerFactory.getLogger(WorkerLauncher.class);
 
     private ApplicationContext springCtx;
 
+    /** Spring context. */
     @Autowired
-    public void setSpringContext(ApplicationContext springCtx) {
+    public final void setSpringContext(ApplicationContext springCtx) {
         this.springCtx = springCtx;
     }
 
+    /**
+     * Main entry point into the app. Should only be called by Spring Boot.
+     *
+     * @param args
+     *         command-line args
+     */
     @Override
     public void run(String... args) {
         LOG.info("Launching workers...");

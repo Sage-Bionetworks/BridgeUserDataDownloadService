@@ -26,7 +26,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.OutputEncryptor;
 
 // TODO: This is copy-pasted from BridgePF. Refactor this into a shared library.
-public final class BcCmsEncryptor {
+public class BcCmsEncryptor {
 
     private final CMSEnvelopedDataGenerator generator;
     private final X509Certificate cert;

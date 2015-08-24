@@ -26,13 +26,13 @@ public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor>
     private S3Helper s3Helper;
 
     @Autowired
-    public void setEnvConfig(EnvironmentConfig envConfig) {
+    public final void setEnvConfig(EnvironmentConfig envConfig) {
         this.envConfig = envConfig;
     }
 
     /** S3 helper, configured by Spring. */
     @Autowired
-    public void setS3Helper(S3Helper s3Helper) {
+    public final void setS3Helper(S3Helper s3Helper) {
         this.s3Helper = s3Helper;
     }
 
