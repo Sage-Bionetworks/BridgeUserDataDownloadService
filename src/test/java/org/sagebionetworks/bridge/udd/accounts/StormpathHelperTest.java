@@ -13,7 +13,7 @@ import com.stormpath.sdk.directory.CustomData;
 import com.stormpath.sdk.directory.Directory;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.crypto.AesGcmEncryptor;
+import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 
 public class StormpathHelperTest {
@@ -37,7 +37,7 @@ public class StormpathHelperTest {
         when(mockStormpathClient.getResource("dummy-stormpath-href", Directory.class)).thenReturn(mockDirectory);
 
         // mock health code encryptor
-        AesGcmEncryptor mockEncryptor = mock(AesGcmEncryptor.class);
+        Encryptor mockEncryptor = mock(Encryptor.class);
         when(mockEncryptor.decrypt("dummy-encrypted-health-id")).thenReturn("dummy-health-id");
 
         // create stormpath helper

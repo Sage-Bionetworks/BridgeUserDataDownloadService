@@ -10,18 +10,18 @@ import com.stormpath.sdk.directory.Directory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.crypto.AesGcmEncryptor;
+import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 
 /** Helper class to get account info from Stormpath. */
 @Component
 public class StormpathHelper {
-    private AesGcmEncryptor healthCodeEncryptor;
+    private Encryptor healthCodeEncryptor;
     private Client stormpathClient;
 
     /** AES GCM encryptor, used to decrypt the health ID from Stormpath custom data. */
     @Resource(name = "healthCodeEncryptor")
-    public final void setHealthCodeEncryptor(AesGcmEncryptor healthCodeEncryptor) {
+    public final void setHealthCodeEncryptor(Encryptor healthCodeEncryptor) {
         this.healthCodeEncryptor = healthCodeEncryptor;
     }
 

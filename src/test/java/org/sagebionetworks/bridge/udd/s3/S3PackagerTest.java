@@ -37,8 +37,8 @@ import org.joda.time.LocalDate;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
-import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
+import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
@@ -171,7 +171,7 @@ public class S3PackagerTest {
     @Test
     public void test() throws Exception {
         // mock encryptor - For test mocking, this will just replace all instances of "encrypted" to "decrypted"
-        BcCmsEncryptor mockEncryptor = mock(BcCmsEncryptor.class);
+        CmsEncryptor mockEncryptor = mock(CmsEncryptor.class);
         when(mockEncryptor.decrypt(any(byte[].class))).thenAnswer(invocation -> {
             byte[] encryptedBytes = invocation.getArgumentAt(0, byte[].class);
             String encryptedString = new String(encryptedBytes, Charsets.UTF_8);
@@ -179,7 +179,7 @@ public class S3PackagerTest {
             return decryptedString.getBytes(Charsets.UTF_8);
         });
 
-        LoadingCache<String, BcCmsEncryptor> mockEncryptorCache = mock(LoadingCache.class);
+        LoadingCache<String, CmsEncryptor> mockEncryptorCache = mock(LoadingCache.class);
         when(mockEncryptorCache.get("test-study")).thenReturn(mockEncryptor);
 
         // mock date time helper - Instead of returning the real "now", return this fake "now"
@@ -189,9 +189,9 @@ public class S3PackagerTest {
         when(mockDateTimeHelper.now()).thenReturn(mockNow);
 
         // mock env config - all we need is upload bucket and user data bucket
-        EnvironmentConfig mockEnvConfig = mock(EnvironmentConfig.class);
-        when(mockEnvConfig.getProperty(S3Packager.CONFIG_KEY_UPLOAD_BUCKET)).thenReturn("dummy-upload-bucket");
-        when(mockEnvConfig.getProperty(S3Packager.CONFIG_KEY_USERDATA_BUCKET)).thenReturn("dummy-userdata-bucket");
+        Config mockEnvConfig = mock(Config.class);
+        when(mockEnvConfig.get(S3Packager.CONFIG_KEY_UPLOAD_BUCKET)).thenReturn("dummy-upload-bucket");
+        when(mockEnvConfig.get(S3Packager.CONFIG_KEY_USERDATA_BUCKET)).thenReturn("dummy-userdata-bucket");
 
         // mock file helper
         MockFileHelper mockFileHelper = new MockFileHelper();

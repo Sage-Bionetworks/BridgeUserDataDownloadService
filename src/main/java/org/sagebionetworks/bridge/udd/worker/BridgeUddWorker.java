@@ -12,9 +12,9 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
+import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
@@ -38,7 +38,7 @@ public class BridgeUddWorker implements Runnable {
     static final String CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS = "worker.sleep.time.millis";
 
     private DynamoHelper dynamoHelper;
-    private EnvironmentConfig environmentConfig;
+    private Config environmentConfig;
     private WorkerLoopManager loopManager;
     private S3Packager s3Packager;
     private SesHelper sesHelper;
@@ -56,7 +56,7 @@ public class BridgeUddWorker implements Runnable {
      * tests.
      */
     @Autowired
-    public final void setEnvironmentConfig(EnvironmentConfig environmentConfig) {
+    public final void setEnvironmentConfig(Config environmentConfig) {
         this.environmentConfig = environmentConfig;
     }
 
@@ -99,7 +99,7 @@ public class BridgeUddWorker implements Runnable {
     /** Main worker loop. */
     @Override
     public void run() {
-        int sleepTimeMillis = environmentConfig.getPropertyAsInt(CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS);
+        int sleepTimeMillis = environmentConfig.getInt(CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS);
 
         while (loopManager.shouldKeepRunning()) {
             // Without this sleep statement, really weird things happen when we Ctrl+C the process. (Not relevant for
