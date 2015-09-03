@@ -1,6 +1,7 @@
 package org.sagebionetworks.bridge.udd.config;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -87,7 +88,11 @@ public class SpringConfig {
         Path localConfigPath = Paths.get(USER_CONFIG_FILE);
 
         try {
-            return new PropertiesConfig(defaultConfigPath, localConfigPath);
+            if (Files.exists(localConfigPath)) {
+                return new PropertiesConfig(defaultConfigPath, localConfigPath);
+            } else {
+                return new PropertiesConfig(defaultConfigPath);
+            }
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
