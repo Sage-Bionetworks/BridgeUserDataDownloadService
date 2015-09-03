@@ -1,6 +1,8 @@
 package org.sagebionetworks.bridge.udd.config;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
@@ -20,8 +22,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
-import org.sagebionetworks.bridge.udd.crypto.AesGcmEncryptor;
-import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
+import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.config.PropertiesConfig;
+import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
+import org.sagebionetworks.bridge.crypto.CmsEncryptor;
+import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.udd.crypto.CmsEncryptorCacheLoader;
 import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
@@ -34,7 +39,7 @@ import org.sagebionetworks.bridge.udd.s3.S3Helper;
 public class SpringConfig {
     @Bean(name = "cmsEncryptorCache")
     @Autowired
-    public LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache(CmsEncryptorCacheLoader cacheLoader) {
+    public LoadingCache<String, CmsEncryptor> cmsEncryptorCache(CmsEncryptorCacheLoader cacheLoader) {
         return CacheBuilder.newBuilder().build(cacheLoader);
     }
 
@@ -45,7 +50,7 @@ public class SpringConfig {
 
     @Bean(name = "ddbPrefix")
     public String ddbPrefix() {
-        EnvironmentConfig envConfig = environmentConfig();
+        Config envConfig = environmentConfig();
         String envName = envConfig.getEnvironment().name().toLowerCase();
         String userName = envConfig.getUser();
         return envName + '-' + userName + '-';
@@ -71,17 +76,29 @@ public class SpringConfig {
         return ddbUploadTable().getIndex("healthCode-uploadDate-index");
     }
 
+    private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
+    private static final String DEFAULT_CONFIG_FILE = CONFIG_FILE;
+    private static final String USER_CONFIG_FILE = System.getProperty("user.home") + "/" + CONFIG_FILE;
+
     @Bean
-    public EnvironmentConfig environmentConfig() {
-        return new EnvironmentConfig();
+    public Config environmentConfig() {
+        String defaultConfig = getClass().getClassLoader().getResource(DEFAULT_CONFIG_FILE).getPath();
+        Path defaultConfigPath = Paths.get(defaultConfig);
+        Path localConfigPath = Paths.get(USER_CONFIG_FILE);
+
+        try {
+            return new PropertiesConfig(defaultConfigPath, localConfigPath);
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     @Bean(name = "healthCodeEncryptor")
-    public AesGcmEncryptor healthCodeEncryptor() throws IOException {
+    public Encryptor healthCodeEncryptor() throws IOException {
         // TODO: BridgePF supports multiple versions of this. However, this will require a code change anyway. We need
         // to refactor these into a shared library anyway, so for the initial investment, do something quick and dirty
         // until we have the resources to do the refactor properly.
-        return new AesGcmEncryptor(environmentConfig().getProperty("health.code.key"));
+        return new AesGcmEncryptor(environmentConfig().get("health.code.key"));
     }
 
     @Bean
@@ -103,10 +120,10 @@ public class SpringConfig {
 
     @Bean
     public Client stormpathClient() throws IOException {
-        EnvironmentConfig envConfig = environmentConfig();
+        Config envConfig = environmentConfig();
 
-        ApiKey apiKey = ApiKeys.builder().setId(envConfig.getProperty("stormpath.id"))
-                .setSecret(envConfig.getProperty("stormpath.secret")).build();
+        ApiKey apiKey = ApiKeys.builder().setId(envConfig.get("stormpath.id"))
+                .setSecret(envConfig.get("stormpath.secret")).build();
         return Clients.builder().setApiKey(apiKey).setBaseUrl("https://enterprise.stormpath.io/v1").build();
     }
 

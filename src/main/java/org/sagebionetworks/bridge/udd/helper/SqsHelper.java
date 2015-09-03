@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
+import org.sagebionetworks.bridge.config.Config;
 
 /** Helper class to wrap polling SQS and deleting messages. */
 @Component
@@ -26,8 +26,8 @@ public class SqsHelper {
 
     /** Environment config, used to get SQS queue URL from configs. */
     @Autowired
-    public final void setEnvConfig(EnvironmentConfig envConfig) {
-        this.sqsQueueUrl = envConfig.getProperty(CONFIG_KEY_SQS_QUEUE_URL);
+    public final void setEnvConfig(Config envConfig) {
+        this.sqsQueueUrl = envConfig.get(CONFIG_KEY_SQS_QUEUE_URL);
 
         // Unconventional, but super helpful in making sure we're configured properly
         LOG.info("Configured SQS queue: " + sqsQueueUrl);

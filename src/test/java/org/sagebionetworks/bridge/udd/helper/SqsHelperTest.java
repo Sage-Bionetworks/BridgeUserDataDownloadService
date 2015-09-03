@@ -16,14 +16,14 @@ import com.amazonaws.services.sqs.model.ReceiveMessageResult;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
+import org.sagebionetworks.bridge.config.Config;
 
 public class SqsHelperTest {
     @Test
     public void testPoll() {
         // mock env config
-        EnvironmentConfig mockEnvConfig = mock(EnvironmentConfig.class);
-        when(mockEnvConfig.getProperty(SqsHelper.CONFIG_KEY_SQS_QUEUE_URL)).thenReturn("dummy-sqs-queue-url");
+        Config mockEnvConfig = mock(Config.class);
+        when(mockEnvConfig.get(SqsHelper.CONFIG_KEY_SQS_QUEUE_URL)).thenReturn("dummy-sqs-queue-url");
 
         // mock sqs client - first test case returns no messages, then 1 message, then 3 messages
         ReceiveMessageResult firstSqsResult = new ReceiveMessageResult().withMessages();
@@ -69,8 +69,8 @@ public class SqsHelperTest {
         // This is just a pass through. Trivial test to test the receipt handle is passed through
 
         // mock env config
-        EnvironmentConfig mockEnvConfig = mock(EnvironmentConfig.class);
-        when(mockEnvConfig.getProperty(SqsHelper.CONFIG_KEY_SQS_QUEUE_URL)).thenReturn("dummy-sqs-queue-url");
+        Config mockEnvConfig = mock(Config.class);
+        when(mockEnvConfig.get(SqsHelper.CONFIG_KEY_SQS_QUEUE_URL)).thenReturn("dummy-sqs-queue-url");
 
         // mock sqs client
         AmazonSQSClient mockSqsClient = mock(AmazonSQSClient.class);

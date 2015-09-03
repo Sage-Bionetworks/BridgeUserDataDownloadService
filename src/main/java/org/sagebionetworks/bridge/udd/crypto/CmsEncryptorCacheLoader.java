@@ -9,7 +9,10 @@ import com.google.common.cache.CacheLoader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
+import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.crypto.BcCmsEncryptor;
+import org.sagebionetworks.bridge.crypto.CmsEncryptor;
+import org.sagebionetworks.bridge.crypto.PemUtils;
 import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
 /**
@@ -19,14 +22,14 @@ import org.sagebionetworks.bridge.udd.s3.S3Helper;
  */
 // TODO: This is copy-pasted and refactored from BridgePF. Refactor this into a shared library.
 @Component
-public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor> {
+public class CmsEncryptorCacheLoader extends CacheLoader<String, CmsEncryptor> {
     private static final String PEM_FILENAME_FORMAT = "%s.pem";
 
-    private EnvironmentConfig envConfig;
+    private Config envConfig;
     private S3Helper s3Helper;
 
     @Autowired
-    public final void setEnvConfig(EnvironmentConfig envConfig) {
+    public final void setEnvConfig(Config envConfig) {
         this.envConfig = envConfig;
     }
 
@@ -38,9 +41,9 @@ public class CmsEncryptorCacheLoader extends CacheLoader<String, BcCmsEncryptor>
 
     /** {@inheritDoc} */
     @Override
-    public BcCmsEncryptor load(String studyId) throws CertificateEncodingException, IOException {
-        String certBucket = envConfig.getProperty("upload.cms.cert.bucket");
-        String privKeyBucket = envConfig.getProperty("upload.cms.priv.bucket");
+    public CmsEncryptor load(String studyId) throws CertificateEncodingException, IOException {
+        String certBucket = envConfig.get("upload.cms.cert.bucket");
+        String privKeyBucket = envConfig.get("upload.cms.priv.bucket");
         String pemFileName = String.format(PEM_FILENAME_FORMAT, studyId);
 
         // download certificate

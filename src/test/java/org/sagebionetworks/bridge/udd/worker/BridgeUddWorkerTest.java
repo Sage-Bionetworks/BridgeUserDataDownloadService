@@ -15,9 +15,9 @@ import com.google.common.collect.ImmutableList;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
+import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
@@ -42,8 +42,8 @@ public class BridgeUddWorkerTest {
         PresignedUrlInfo mockPresignedUrlInfo = mock(PresignedUrlInfo.class);
 
         // mock env config - set sleep time to zero so we don't needlessly sleep in unit tests
-        EnvironmentConfig mockEnvConfig = mock(EnvironmentConfig.class);
-        when(mockEnvConfig.getPropertyAsInt(BridgeUddWorker.CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS)).thenReturn(0);
+        Config mockEnvConfig = mock(Config.class);
+        when(mockEnvConfig.getInt(BridgeUddWorker.CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS)).thenReturn(0);
 
         // mock loop manager - 2 iterations
         WorkerLoopManager mockLoopManager = mock(WorkerLoopManager.class);

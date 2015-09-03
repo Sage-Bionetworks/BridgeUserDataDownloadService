@@ -22,8 +22,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.config.EnvironmentConfig;
-import org.sagebionetworks.bridge.udd.crypto.BcCmsEncryptor;
+import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
@@ -48,9 +48,9 @@ public class S3Packager {
     private static final Joiner LINE_JOINER = Joiner.on('\n');
     private static final int PROGRESS_INTERVAL = 100;
 
-    private LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache;
+    private LoadingCache<String, CmsEncryptor> cmsEncryptorCache;
     private DateTimeHelper dateTimeHelper;
-    private EnvironmentConfig envConfig;
+    private Config envConfig;
     private FileHelper fileHelper;
     private S3Helper s3Helper;
 
@@ -59,7 +59,7 @@ public class S3Packager {
      * files downloaded from S3.
      */
     @Resource(name = "cmsEncryptorCache")
-    public final void setCmsEncryptorCache(LoadingCache<String, BcCmsEncryptor> cmsEncryptorCache) {
+    public final void setCmsEncryptorCache(LoadingCache<String, CmsEncryptor> cmsEncryptorCache) {
         this.cmsEncryptorCache = cmsEncryptorCache;
     }
 
@@ -71,7 +71,7 @@ public class S3Packager {
 
     /** Environment configs. Used to get the upload and user data S3 buckets. */
     @Autowired
-    public final void setEnvConfig(EnvironmentConfig envConfig) {
+    public final void setEnvConfig(Config envConfig) {
         this.envConfig = envConfig;
     }
 
@@ -122,9 +122,9 @@ public class S3Packager {
 
             try {
                 // download and decrypt
-                String uploadBucketName = envConfig.getProperty(CONFIG_KEY_UPLOAD_BUCKET);
+                String uploadBucketName = envConfig.get(CONFIG_KEY_UPLOAD_BUCKET);
                 byte[] encryptedUploadData = s3Helper.readS3FileAsBytes(uploadBucketName, uploadId);
-                BcCmsEncryptor encryptor = cmsEncryptorCache.get(request.getStudyId());
+                CmsEncryptor encryptor = cmsEncryptorCache.get(request.getStudyId());
                 byte[] uploadData = encryptor.decrypt(encryptedUploadData);
 
                 // write to temp dir
@@ -178,7 +178,7 @@ public class S3Packager {
         }
 
         // upload to S3
-        String userdataBucketName = envConfig.getProperty(CONFIG_KEY_USERDATA_BUCKET);
+        String userdataBucketName = envConfig.get(CONFIG_KEY_USERDATA_BUCKET);
         s3Helper.getS3Client().putObject(userdataBucketName, masterZipFilename, masterZipFile);
 
         // cleanup
