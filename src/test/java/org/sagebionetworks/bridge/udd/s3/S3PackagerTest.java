@@ -4,7 +4,9 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.startsWith;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -40,7 +42,6 @@ import org.testng.annotations.Test;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
-import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 
@@ -182,12 +183,6 @@ public class S3PackagerTest {
         LoadingCache<String, CmsEncryptor> mockEncryptorCache = mock(LoadingCache.class);
         when(mockEncryptorCache.get("test-study")).thenReturn(mockEncryptor);
 
-        // mock date time helper - Instead of returning the real "now", return this fake "now"
-        DateTime mockNow = DateTime.parse("2015-08-19T14:00:00-07:00");
-        long expectedExpirationDateMillis = mockNow.plusHours(S3Packager.URL_EXPIRATION_HOURS).getMillis();
-        DateTimeHelper mockDateTimeHelper = mock(DateTimeHelper.class);
-        when(mockDateTimeHelper.now()).thenReturn(mockNow);
-
         // mock env config - all we need is upload bucket and user data bucket
         Config mockEnvConfig = mock(Config.class);
         when(mockEnvConfig.get(S3Packager.CONFIG_KEY_UPLOAD_BUCKET)).thenReturn("dummy-upload-bucket");
@@ -227,12 +222,16 @@ public class S3PackagerTest {
         });
 
         // set up test packager
-        S3Packager s3Packager = new S3Packager();
+        S3Packager s3Packager = spy(new S3Packager());
         s3Packager.setCmsEncryptorCache(mockEncryptorCache);
-        s3Packager.setDateTimeHelper(mockDateTimeHelper);
         s3Packager.setEnvConfig(mockEnvConfig);
         s3Packager.setFileHelper(mockFileHelper);
         s3Packager.setS3Helper(mockS3Helper);
+
+        // spy "now" - Instead of returning the real "now", return this fake "now"
+        DateTime mockNow = DateTime.parse("2015-08-19T14:00:00-07:00");
+        long expectedExpirationDateMillis = mockNow.plusHours(S3Packager.URL_EXPIRATION_HOURS).getMillis();
+        doReturn(mockNow).when(s3Packager).now();
 
         // set up test inputs
         BridgeUddRequest request = new BridgeUddRequest.Builder().withStudyId("test-study")

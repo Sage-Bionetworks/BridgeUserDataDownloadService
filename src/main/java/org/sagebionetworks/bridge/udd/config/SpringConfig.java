@@ -18,6 +18,8 @@ import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.api.ApiKeys;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
+import org.sagebionetworks.client.SynapseAdminClientImpl;
+import org.sagebionetworks.client.SynapseClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -67,6 +69,11 @@ public class SpringConfig {
         return ddbClient().getTable(ddbPrefix() + "Study");
     }
 
+    @Bean(name = "ddbSynapseMapTable")
+    public Table ddbSynapseMapTable() {
+        return ddbClient().getTable(environmentConfig().get("synapse.map.table"));
+    }
+
     @Bean(name = "ddbUploadTable")
     public Table ddbUploadTable() {
         return ddbClient().getTable(ddbPrefix() + "Upload2");
@@ -75,6 +82,16 @@ public class SpringConfig {
     @Bean(name = "ddbUploadTableIndex")
     public Index ddbUploadTableIndex() {
         return ddbUploadTable().getIndex("healthCode-uploadDate-index");
+    }
+
+    @Bean(name = "ddbUploadSchemaTable")
+    public Table ddbUploadSchemaTable() {
+        return ddbClient().getTable(ddbPrefix() + "UploadSchema");
+    }
+
+    @Bean(name = "ddbUploadSchemaStudyIndex")
+    public Index ddbUploadSchemaStudyIndex() {
+        return ddbUploadSchemaTable().getIndex("studyId-index");
     }
 
     private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
@@ -135,5 +152,15 @@ public class SpringConfig {
     @Bean
     public AmazonSQSClient sqsClient() {
         return new AmazonSQSClient();
+    }
+
+    @Bean
+    public SynapseClient synapseClient() {
+        Config envConfig = environmentConfig();
+
+        SynapseClient synapseClient = new SynapseAdminClientImpl();
+        synapseClient.setUserName(envConfig.get("synapse.user"));
+        synapseClient.setApiKey(envConfig.get("synapse.api.key"));
+        return synapseClient;
     }
 }

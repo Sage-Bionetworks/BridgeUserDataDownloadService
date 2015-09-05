@@ -1,6 +1,7 @@
 package org.sagebionetworks.bridge.udd.worker;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.amazonaws.services.sqs.model.Message;
@@ -18,11 +19,12 @@ import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
+import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.helper.SqsHelper;
-import org.sagebionetworks.bridge.udd.helper.WorkerLoopManager;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.s3.S3Packager;
+import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
 /**
@@ -39,11 +41,11 @@ public class BridgeUddWorker implements Runnable {
 
     private DynamoHelper dynamoHelper;
     private Config environmentConfig;
-    private WorkerLoopManager loopManager;
     private S3Packager s3Packager;
     private SesHelper sesHelper;
     private SqsHelper sqsHelper;
     private StormpathHelper stormpathHelper;
+    private SynapsePackager synapsePackager;
 
     /** Dynamo DB helper, used to get study info and uploads. */
     @Autowired
@@ -58,15 +60,6 @@ public class BridgeUddWorker implements Runnable {
     @Autowired
     public final void setEnvironmentConfig(Config environmentConfig) {
         this.environmentConfig = environmentConfig;
-    }
-
-    /**
-     * Loop manager, to determine how long to loop for. Its primary purpose is to allow a fixed number of repetitions
-     * for a unit test.
-     */
-    @Autowired
-    public final void setLoopManager(WorkerLoopManager loopManager) {
-        this.loopManager = loopManager;
     }
 
     /**
@@ -96,12 +89,18 @@ public class BridgeUddWorker implements Runnable {
         this.stormpathHelper = stormpathHelper;
     }
 
+    /** Synapse packager. Used to query Synapse and package the results in an S3 pre-signed URL. */
+    @Autowired
+    public void setSynapsePackager(SynapsePackager synapsePackager) {
+        this.synapsePackager = synapsePackager;
+    }
+
     /** Main worker loop. */
     @Override
     public void run() {
         int sleepTimeMillis = environmentConfig.getInt(CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS);
 
-        while (loopManager.shouldKeepRunning()) {
+        while (shouldKeepRunning()) {
             // Without this sleep statement, really weird things happen when we Ctrl+C the process. (Not relevant for
             // production, but happens all the time for local testing.) Empirically, it takes up to 125ms for the JVM
             // to shut down cleanly.) Plus, it prevents us from polling the SQS queue too fast when there are a lot of
@@ -125,31 +124,47 @@ public class BridgeUddWorker implements Runnable {
                 BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(sqsMessageText,
                         BridgeUddRequest.class);
 
+                String username = request.getUsername();
+                int userHash = username.hashCode();
+                String studyId = request.getStudyId();
                 String startDateStr = request.getStartDate().toString();
                 String endDateStr = request.getEndDate().toString();
-                LOG.info("Received request for hash[username]=" + request.getUsername().hashCode() + ", study=" +
-                        request.getStudyId() + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
+                LOG.info("Received request for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
+                        startDateStr + ",endDate=" + endDateStr);
 
                 Stopwatch requestStopwatch = Stopwatch.createStarted();
                 try {
                     // This sequence of helpers does the following:
                     //  * get the study from DDB (because accounts are partitioned on Study)
                     //  * get the account from Stormpath
+                    //  * get the health code from the health ID using the DDB mapping
+                    //  * get the list of synapse tables from DDB
+                    //  * queries Synapse and packages the results in an S3 pre-signed URL
+                    StudyInfo studyInfo = dynamoHelper.getStudy(studyId);
+                    AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
+                    String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
+                    Map<String, UploadSchemaKey> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
+                    synapsePackager.packageSynapseData(synapseToSchemaMap, healthCode, request);
+
+                    // TODO
+                    /*
+                    // This sequence of helpers does the following:
+                    //  * get the study from DDB (because accounts are partitioned on Study)
+                    //  * get the account from Stormpath
                     //  * get the upload metadata from DDB
                     //  * download the uploads, zip then, and write them back to S3
                     //  * email the S3 link to the user
-                    StudyInfo studyInfo = dynamoHelper.getStudy(request.getStudyId());
-                    AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, request.getUsername());
                     List<UploadInfo> uploadInfoList = dynamoHelper.getUploadsForRequest(accountInfo, request);
                     PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
                     sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
+                    */
 
                     // We're done processing the SQS message. Delete it so it doesn't get duped.
                     sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());
                 } finally {
                     LOG.info("Request took " + requestStopwatch.elapsed(TimeUnit.SECONDS) +
-                            " seconds for hash[username]=" + request.getUsername().hashCode() + ", study=" +
-                            request.getStudyId() + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
+                            " seconds for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
+                            startDateStr + ",endDate=" + endDateStr);
                 }
             } catch (Exception ex) {
                 LOG.error("BridgeUddWorker exception: " + ex.getMessage(), ex);
@@ -157,5 +172,11 @@ public class BridgeUddWorker implements Runnable {
                 LOG.error("BridgeUddWorker critical error: " + err.getMessage(), err);
             }
         }
+    }
+
+    // This is called by BridgeUddWorker for every loop iteration to determine if worker should keep running. This
+    // is a member method to enable mocking and is package-scoped to make it available to unit tests.
+    boolean shouldKeepRunning() {
+        return true;
     }
 }

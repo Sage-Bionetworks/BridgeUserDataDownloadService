@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
-import org.sagebionetworks.bridge.udd.helper.DateTimeHelper;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 
@@ -49,7 +48,6 @@ public class S3Packager {
     private static final int PROGRESS_INTERVAL = 100;
 
     private LoadingCache<String, CmsEncryptor> cmsEncryptorCache;
-    private DateTimeHelper dateTimeHelper;
     private Config envConfig;
     private FileHelper fileHelper;
     private S3Helper s3Helper;
@@ -61,12 +59,6 @@ public class S3Packager {
     @Resource(name = "cmsEncryptorCache")
     public final void setCmsEncryptorCache(LoadingCache<String, CmsEncryptor> cmsEncryptorCache) {
         this.cmsEncryptorCache = cmsEncryptorCache;
-    }
-
-    /** Helper class to get "now". Used by unit tests to mock out "now" for deterministic tests". */
-    @Autowired
-    public final void setDateTimeHelper(DateTimeHelper dateTimeHelper) {
-        this.dateTimeHelper = dateTimeHelper;
     }
 
     /** Environment configs. Used to get the upload and user data S3 buckets. */
@@ -186,9 +178,15 @@ public class S3Packager {
         fileHelper.deleteDir(tmpDir);
 
         // Get pre-signed URL for download. This URL expires after a number of hours, defined by configuration.
-        DateTime expirationTime = dateTimeHelper.now().plusHours(URL_EXPIRATION_HOURS);
+        DateTime expirationTime = now().plusHours(URL_EXPIRATION_HOURS);
         URL presignedUrl = s3Helper.getS3Client().generatePresignedUrl(userdataBucketName, masterZipFilename,
                 expirationTime.toDate(), HttpMethod.GET);
         return new PresignedUrlInfo.Builder().withUrl(presignedUrl).withExpirationTime(expirationTime).build();
+    }
+
+    // Helper method which returns "now". This is moved into a member method to enable mocking and is package-scoped to
+    // make it available to unit tests.
+    DateTime now() {
+        return DateTime.now();
     }
 }

@@ -7,6 +7,7 @@ import static org.testng.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.KeyConditions;
 import com.amazonaws.services.dynamodbv2.document.RangeKeyCondition;
@@ -49,8 +50,9 @@ public class DynamoHelperTest {
         // Index.query() can't be mocked, so override queryHelper to sidestep this problem
         DynamoHelper testHelper = new DynamoHelper() {
             @Override
-            protected Iterable<Item> queryHelper(String indexKeyName, Object indexKeyValue,
+            protected Iterable<Item> queryHelper(Index index, String indexKeyName, Object indexKeyValue,
                     RangeKeyCondition rangeKeyCondition) {
+                // TODO
                 assertEquals(indexKeyName, "healthCode");
                 assertEquals(indexKeyValue, "dummy-health-code");
                 assertEquals(rangeKeyCondition.getAttrName(), "uploadDate");
