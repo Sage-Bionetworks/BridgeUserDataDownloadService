@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
@@ -40,6 +42,11 @@ import org.sagebionetworks.bridge.udd.s3.S3Helper;
 @ComponentScan("org.sagebionetworks.bridge.udd")
 @Configuration
 public class SpringConfig {
+    @Bean(name = "auxiliaryExecutorService")
+    public ExecutorService auxiliaryExecutorService() {
+        return Executors.newFixedThreadPool(environmentConfig().getInt("threadpool.aux.count"));
+    }
+
     @Bean(name = "cmsEncryptorCache")
     @Autowired
     public LoadingCache<String, CmsEncryptor> cmsEncryptorCache(CmsEncryptorCacheLoader cacheLoader) {

@@ -153,7 +153,7 @@ public class S3Packager {
 
         LOG.info("Compressing " + numUploads + " files for hash[username]=" + userHash);
         try (BufferedOutputStream masterZipBufferedOutputStream =
-                new BufferedOutputStream(fileHelper.getStream(masterZipFile));
+                new BufferedOutputStream(fileHelper.getOutputStream(masterZipFile));
                 ZipOutputStream zipOutputStream = new ZipOutputStream(masterZipBufferedOutputStream, Charsets.UTF_8)) {
             int numZipped = 0;
             for (File oneUploadFile : uploadFileList) {

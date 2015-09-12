@@ -1,6 +1,5 @@
 package org.sagebionetworks.bridge.udd.dynamodb;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Strings;
 
 /** This class represents an upload schema key, with a study ID, schema ID, and revision. */
@@ -29,25 +28,6 @@ public final class UploadSchemaKey {
     /** Revision number of the schema. */
     public int getRevision() {
         return revision;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        UploadSchemaKey that = (UploadSchemaKey) o;
-        return Objects.equal(revision, that.revision) &&
-                Objects.equal(studyId, that.studyId) &&
-                Objects.equal(schemaId, that.schemaId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(studyId, schemaId, revision);
     }
 
     /**

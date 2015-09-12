@@ -19,7 +19,7 @@ import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
+import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
@@ -143,7 +143,7 @@ public class BridgeUddWorker implements Runnable {
                     StudyInfo studyInfo = dynamoHelper.getStudy(studyId);
                     AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
                     String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
-                    Map<String, UploadSchemaKey> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
+                    Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
                     synapsePackager.packageSynapseData(synapseToSchemaMap, healthCode, request);
 
                     // TODO

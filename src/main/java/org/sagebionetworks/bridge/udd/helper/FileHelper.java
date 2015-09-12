@@ -1,9 +1,12 @@
 package org.sagebionetworks.bridge.udd.helper;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Reader;
+import java.util.List;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
@@ -39,14 +42,24 @@ public class FileHelper {
         }
     }
 
-    /** Non-static get stream. */
-    public OutputStream getStream(File file) throws IOException {
+    /** Non-static get output (write) stream. */
+    public OutputStream getOutputStream(File file) throws FileNotFoundException {
         return new FileOutputStream(file);
+    }
+
+    /** Non-static get reader. */
+    public Reader getReader(File file) throws FileNotFoundException {
+        return Files.newReader(file, Charsets.UTF_8);
     }
 
     /** Non-static File constructor. */
     public File newFile(File parent, String filename) {
         return new File(parent, filename);
+    }
+
+    /** Non-static read lines from file. */
+    public List<String> readLines(File from) throws IOException {
+        return Files.readLines(from, Charsets.UTF_8);
     }
 
     /** Non-static method to write bytes to the specified file. */

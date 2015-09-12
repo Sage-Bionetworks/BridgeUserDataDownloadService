@@ -82,7 +82,7 @@ public class S3PackagerTest {
         }
 
         @Override
-        public OutputStream getStream(File file) {
+        public OutputStream getOutputStream(File file) {
             // No need to check if the file exists, because like the real file system, the file won't be created until
             // you write.
             String filePath = file.getAbsolutePath();

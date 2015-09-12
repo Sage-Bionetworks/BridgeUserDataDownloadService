@@ -1,11 +1,10 @@
 package org.sagebionetworks.bridge.udd.dynamodb;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Resource;
 
 import com.amazonaws.services.dynamodbv2.document.Index;
@@ -91,53 +90,46 @@ public class DynamoHelper {
 
     /**
      * Gets the Synapse table IDs associated with this study. The results are returned as a map from the Synapse table
-     * IDs to the Bridge upload schema keys.
+     * IDs to the Bridge upload schemas.
      *
      * @param studyId
      *         ID of the study to query on
      * @return map from the Synapse table IDs to the Bridge upload schema keys
      */
-    public Map<String, UploadSchemaKey> getSynapseTableIdsForStudy(String studyId) {
-        // The DDB key for upload schemas is in the form "[studyId]:[schemaId]", so strip away the "[studyId]:" part.
-        // The prefix length is the length of studyId + 1 (for the colon).
-        int studyPrefixLen = studyId.length() + 1;
-
+    public Map<String, UploadSchema> getSynapseTableIdsForStudy(String studyId) throws IOException {
         // query and iterate
-        Set<UploadSchemaKey> schemaSet = new HashSet<>();
-        Iterable<Item> schemaIter = queryHelper(ddbUploadSchemaStudyIndex, "studyId", studyId, null);
-        for (Item oneSchema : schemaIter) {
-            String ddbKey = oneSchema.getString("key");
-            String schemaId = ddbKey.substring(studyPrefixLen);
-            int rev = oneSchema.getInt("revision");
-            UploadSchemaKey schemaKey = new UploadSchemaKey.Builder().withStudyId(studyId).withSchemaId(schemaId)
-                    .withRevision(rev).build();
-            schemaSet.add(schemaKey);
+        List<UploadSchema> schemaList = new ArrayList<>();
+        Iterable<Item> schemaItemIter = queryHelper(ddbUploadSchemaStudyIndex, "studyId", studyId, null);
+        for (Item oneSchemaItem : schemaItemIter) {
+            UploadSchema schema = UploadSchema.fromDdbItem(oneSchemaItem);
+            schemaList.add(schema);
         }
 
         // Now query the SynapseTables table to get the Synapse table IDs for the schema. We use a reverse map from
         // Synapse table ID to upload schema, because multiple upload schemas can map to a single Synapse table. (This
         // is due to some early day hacks in the original studies.)
-        Multimap<String, UploadSchemaKey> synapseToSchemaMultimap = HashMultimap.create();
-        for (UploadSchemaKey oneSchemaKey : schemaSet) {
-            Item synapseMapRecord = ddbSynapseMapTable.getItem("schemaKey", oneSchemaKey.toString());
+        Multimap<String, UploadSchema> synapseToSchemaMultimap = HashMultimap.create();
+        for (UploadSchema oneSchema : schemaList) {
+            Item synapseMapRecord = ddbSynapseMapTable.getItem("schemaKey", oneSchema.getKey().toString());
             String synapseTableId = synapseMapRecord.getString("tableId");
-            synapseToSchemaMultimap.put(synapseTableId, oneSchemaKey);
+            synapseToSchemaMultimap.put(synapseTableId, oneSchema);
         }
 
-        // Dedupe the upload schema keys. We pick the canonical schema based on which one has the highest rev.
-        Map<String, UploadSchemaKey> synapseToSchemaMap = new HashMap<>();
+        // Dedupe the upload schemas. We pick the canonical schema based on which one has the highest rev.
+        Map<String, UploadSchema> synapseToSchemaMap = new HashMap<>();
         for (String oneSynapseTableId : synapseToSchemaMultimap.keySet()) {
-            Iterable<UploadSchemaKey> schemaKeyIter = synapseToSchemaMultimap.get(oneSynapseTableId);
-            UploadSchemaKey canonicalSchemaKey = null;
-            for (UploadSchemaKey oneSchemaKey : schemaKeyIter) {
-                if (canonicalSchemaKey == null || canonicalSchemaKey.getRevision() < oneSchemaKey.getRevision()) {
-                    canonicalSchemaKey = oneSchemaKey;
+            Iterable<UploadSchema> schemaIter = synapseToSchemaMultimap.get(oneSynapseTableId);
+            UploadSchema canonicalSchema = null;
+            for (UploadSchema oneSchema : schemaIter) {
+                if (canonicalSchema == null ||
+                        canonicalSchema.getKey().getRevision() < oneSchema.getKey().getRevision()) {
+                    canonicalSchema = oneSchema;
                 }
             }
 
             // Because of the way this code is written, there will always be at least one schema for this table ID, so
-            // by this point, canonicalSchemaKey won't be null.
-            synapseToSchemaMap.put(oneSynapseTableId, canonicalSchemaKey);
+            // by this point, canonicalSchema won't be null.
+            synapseToSchemaMap.put(oneSynapseTableId, canonicalSchema);
         }
 
         return synapseToSchemaMap;
