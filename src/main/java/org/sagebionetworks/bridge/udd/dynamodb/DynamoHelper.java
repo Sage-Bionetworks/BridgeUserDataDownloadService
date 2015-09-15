@@ -25,6 +25,7 @@ public class DynamoHelper {
     private Table ddbStudyTable;
     private Table ddbSynapseMapTable;
     private Index ddbUploadTableIndex;
+    private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
 
     /** Health ID table. */
@@ -49,6 +50,12 @@ public class DynamoHelper {
     @Resource(name = "ddbUploadTableIndex")
     public final void setDdbUploadTableIndex(Index ddbUploadTableIndex) {
         this.ddbUploadTableIndex = ddbUploadTableIndex;
+    }
+
+    /** Upload schema table. */
+    @Resource(name = "ddbUploadSchemaTable")
+    public final void setDdbUploadSchemaTable(Table ddbUploadSchemaTable) {
+        this.ddbUploadSchemaTable = ddbUploadSchemaTable;
     }
 
     /** UploadSchema studyId-index. */
@@ -101,7 +108,12 @@ public class DynamoHelper {
         List<UploadSchema> schemaList = new ArrayList<>();
         Iterable<Item> schemaItemIter = queryHelper(ddbUploadSchemaStudyIndex, "studyId", studyId, null);
         for (Item oneSchemaItem : schemaItemIter) {
-            UploadSchema schema = UploadSchema.fromDdbItem(oneSchemaItem);
+            // Index only contains study ID, key, and revision. Re-query the table to get all fields.
+            String key = oneSchemaItem.getString("key");
+            int rev = oneSchemaItem.getInt("revision");
+            Item fullSchemaItem = ddbUploadSchemaTable.getItem("key", key, "revision", rev);
+
+            UploadSchema schema = UploadSchema.fromDdbItem(fullSchemaItem);
             schemaList.add(schema);
         }
 

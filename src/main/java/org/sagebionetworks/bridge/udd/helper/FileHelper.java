@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Reader;
+import java.io.Writer;
 import java.util.List;
 
 import com.google.common.base.Charsets;
@@ -42,6 +43,11 @@ public class FileHelper {
         }
     }
 
+    /** Tests if the file exists. Unit tests override this to hook into our mock file system. */
+    public boolean exists(File file) {
+        return file.exists();
+    }
+
     /** Non-static get output (write) stream. */
     public OutputStream getOutputStream(File file) throws FileNotFoundException {
         return new FileOutputStream(file);
@@ -50,6 +56,16 @@ public class FileHelper {
     /** Non-static get reader. */
     public Reader getReader(File file) throws FileNotFoundException {
         return Files.newReader(file, Charsets.UTF_8);
+    }
+
+    /** Non-static get writer. */
+    public Writer getWriter(File file) throws FileNotFoundException {
+        return Files.newWriter(file, Charsets.UTF_8);
+    }
+
+    /** Non-static move. */
+    public void move(File from, File to) throws IOException {
+        Files.move(from, to);
     }
 
     /** Non-static File constructor. */

@@ -11,15 +11,12 @@ import java.util.concurrent.Future;
 import javax.annotation.Resource;
 
 import org.joda.time.LocalDate;
-import org.sagebionetworks.client.SynapseClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
@@ -34,22 +31,15 @@ public class SynapsePackager {
     private static final Logger LOG = LoggerFactory.getLogger(SynapsePackager.class);
 
     private ExecutorService auxiliaryExecutorService;
-    private Config config;
     private FileHelper fileHelper;
-    private SynapseClient synapseClient;
+    private SynapseHelper synapseHelper;
 
     /**
      * Auxiliary executor service (thread pool), used secondary thread tasks. (As opposed to listener executor service.
      */
     @Resource(name = "auxiliaryExecutorService")
-    public void setAuxiliaryExecutorService(ExecutorService auxiliaryExecutorService) {
+    public final void setAuxiliaryExecutorService(ExecutorService auxiliaryExecutorService) {
         this.auxiliaryExecutorService = auxiliaryExecutorService;
-    }
-
-    /** Bridge config. This is used to get poll intervals and retry timeouts. */
-    @Autowired
-    public final void setConfig(Config config) {
-        this.config = config;
     }
 
     /**
@@ -57,14 +47,14 @@ public class SynapsePackager {
      * system.
      */
     @Autowired
-    public void setFileHelper(FileHelper fileHelper) {
+    public final void setFileHelper(FileHelper fileHelper) {
         this.fileHelper = fileHelper;
     }
 
-    /** Synapse client. */
+    /** Synapse helper. */
     @Autowired
-    public final void setSynapseClient(SynapseClient synapseClient) {
-        this.synapseClient = synapseClient;
+    public void setSynapseHelper(SynapseHelper synapseHelper) {
+        this.synapseHelper = synapseHelper;
     }
 
     /**
@@ -87,7 +77,7 @@ public class SynapsePackager {
 
         // create async threads to download CSVs
         File tmpDir = fileHelper.createTempDir();
-        List<Future<?>> taskFutureList = new ArrayList<>();
+        List<Future<List<File>>> taskFutureList = new ArrayList<>();
         for (Map.Entry<String, UploadSchema> oneSynapseToSchemaEntry : synapseToSchemaMap.entrySet()) {
             // create params
             String synapseTableId = oneSynapseToSchemaEntry.getKey();
@@ -98,18 +88,25 @@ public class SynapsePackager {
 
             // kick off async task
             SynapseDownloadFromTableTask downloadCsvTask = newDownloadCsvTask(param);
-            Future<?> downloadCsvTaskFuture = auxiliaryExecutorService.submit(downloadCsvTask);
+            Future<List<File>> downloadCsvTaskFuture = auxiliaryExecutorService.submit(downloadCsvTask);
             taskFutureList.add(downloadCsvTaskFuture);
         }
 
         // join on threads until they're all done
-        for (Future<?> oneTaskFuture : taskFutureList) {
+        List<File> allFileList = new ArrayList<>();
+        for (Future<List<File>> oneTaskFuture : taskFutureList) {
+            List<File> taskFileList;
             try {
-                oneTaskFuture.get();
+                taskFileList = oneTaskFuture.get();
             } catch (ExecutionException | InterruptedException ex) {
                 LOG.error("Error downloading CSV: " + ex.getMessage(), ex);
+                continue;
             }
+
+            allFileList.addAll(taskFileList);
         }
+
+        // TODO zip
 
         // TODO
         // TODO cleanup files
@@ -124,9 +121,7 @@ public class SynapsePackager {
     SynapseDownloadFromTableTask newDownloadCsvTask(SynapseDownloadFromTableParameters param) {
         SynapseDownloadFromTableTask task = new SynapseDownloadFromTableTask(param);
         task.setFileHelper(fileHelper);
-        task.setPollIntervalMillis(config.getInt("synapse.poll.interval.millis"));
-        task.setPollMaxTries(config.getInt("synapse.poll.max.tries"));
-        task.setSynapseClient(synapseClient);
+        task.setSynapseHelper(synapseHelper);
         return task;
     }
 }

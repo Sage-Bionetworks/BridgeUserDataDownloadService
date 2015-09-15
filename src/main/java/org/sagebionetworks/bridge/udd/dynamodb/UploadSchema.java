@@ -58,8 +58,7 @@ public class UploadSchema {
         schemaBuilder.withKey(key);
 
         // add fields
-        JsonNode fieldDefList = BridgeUddUtil.JSON_OBJECT_MAPPER.readTree(ddbItem.getString(
-                "fieldDefinitions"));
+        JsonNode fieldDefList = BridgeUddUtil.JSON_OBJECT_MAPPER.readTree(ddbItem.getString("fieldDefinitions"));
         for (JsonNode oneFieldDef : fieldDefList) {
             String name = oneFieldDef.get("name").textValue();
             String bridgeType = oneFieldDef.get("type").textValue();
