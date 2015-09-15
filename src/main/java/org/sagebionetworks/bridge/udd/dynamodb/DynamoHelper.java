@@ -148,37 +148,6 @@ public class DynamoHelper {
     }
 
     /**
-     * Fetches uploads for the given account matching the request parameters.
-     *
-     * @param accountInfo
-     *         account info needed to complete the request
-     * @param request
-     *         request parameters to match uploads against
-     * @return list of uploads matching the given account and request
-     */
-    public List<UploadInfo> getUploadsForRequest(AccountInfo accountInfo, BridgeUddRequest request) {
-        String startDateString = request.getStartDate().toString();
-        String endDateString = request.getEndDate().toString();
-
-        // convert healthId to healthCode
-        String healthCode = getHealthCodeFromHealthId(accountInfo.getHealthId());
-
-        // get uploads from healthCode-uploadDate-index
-        Iterable<Item> uploadIter = queryHelper(ddbUploadTableIndex, "healthCode", healthCode,
-                new RangeKeyCondition("uploadDate").between(startDateString, endDateString));
-
-        List<UploadInfo> uploadInfoList = new ArrayList<>();
-        for (Item oneUpload : uploadIter) {
-            String uploadId = oneUpload.getString("uploadId");
-            String uploadDateStr = oneUpload.getString("uploadDate");
-            UploadInfo oneUploadInfo = new UploadInfo.Builder().withId(uploadId)
-                    .withUploadDate(uploadDateStr).build();
-            uploadInfoList.add(oneUploadInfo);
-        }
-        return uploadInfoList;
-    }
-
-    /**
      * <p>
      * This abstracts away the call to Index.query(), which returns an ItemCollection. While ItemCollection implements
      * Iterable, it overrides iterator() to return an IteratorSupport, which is not publicly exposed. This makes

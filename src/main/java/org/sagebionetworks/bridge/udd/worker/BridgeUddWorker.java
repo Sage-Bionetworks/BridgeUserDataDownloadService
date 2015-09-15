@@ -1,6 +1,5 @@
 package org.sagebionetworks.bridge.udd.worker;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -18,12 +17,10 @@ import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
-import org.sagebionetworks.bridge.udd.s3.S3Packager;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
@@ -41,7 +38,6 @@ public class BridgeUddWorker implements Runnable {
 
     private DynamoHelper dynamoHelper;
     private Config environmentConfig;
-    private S3Packager s3Packager;
     private SesHelper sesHelper;
     private SqsHelper sqsHelper;
     private StormpathHelper stormpathHelper;
@@ -60,15 +56,6 @@ public class BridgeUddWorker implements Runnable {
     @Autowired
     public final void setEnvironmentConfig(Config environmentConfig) {
         this.environmentConfig = environmentConfig;
-    }
-
-    /**
-     * S3 Packager, which packages uploads into a master zip file, uploads the zip file to S3, and generates and
-     * returns an S3 pre-signed URL.
-     */
-    @Autowired
-    public final void setS3Packager(S3Packager s3Packager) {
-        this.s3Packager = s3Packager;
     }
 
     /** SES helper, used to email the pre-signed URL to the requesting user. */
@@ -134,30 +121,22 @@ public class BridgeUddWorker implements Runnable {
 
                 Stopwatch requestStopwatch = Stopwatch.createStarted();
                 try {
-                    // This sequence of helpers does the following:
-                    //  * get the study from DDB (because accounts are partitioned on Study)
-                    //  * get the account from Stormpath
-                    //  * get the health code from the health ID using the DDB mapping
-                    //  * get the list of synapse tables from DDB
-                    //  * queries Synapse and packages the results in an S3 pre-signed URL
+                    // We need the study, because accounts and data are partitioned on study.
                     StudyInfo studyInfo = dynamoHelper.getStudy(studyId);
+
                     AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
                     String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
                     Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
-                    synapsePackager.packageSynapseData(synapseToSchemaMap, healthCode, request);
+                    PresignedUrlInfo presignedUrlInfo = synapsePackager.packageSynapseData(synapseToSchemaMap,
+                            healthCode, request);
 
-                    // TODO
-                    /*
-                    // This sequence of helpers does the following:
-                    //  * get the study from DDB (because accounts are partitioned on Study)
-                    //  * get the account from Stormpath
-                    //  * get the upload metadata from DDB
-                    //  * download the uploads, zip then, and write them back to S3
-                    //  * email the S3 link to the user
-                    List<UploadInfo> uploadInfoList = dynamoHelper.getUploadsForRequest(accountInfo, request);
-                    PresignedUrlInfo presignedUrlInfo = s3Packager.packageFilesForUploadList(request, uploadInfoList);
-                    sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
-                    */
+                    if (presignedUrlInfo == null) {
+                        LOG.info("No data for request for hash[username]=" + userHash + ", study=" + studyId +
+                                ", startDate=" + startDateStr + ",endDate=" + endDateStr);
+                        sesHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);
+                    } else {
+                        sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
+                    }
 
                     // We're done processing the SQS message. Delete it so it doesn't get duped.
                     sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());

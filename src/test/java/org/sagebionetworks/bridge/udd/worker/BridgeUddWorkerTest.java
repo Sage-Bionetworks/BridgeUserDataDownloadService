@@ -23,11 +23,9 @@ import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadInfo;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
-import org.sagebionetworks.bridge.udd.s3.S3Packager;
 
 public class BridgeUddWorkerTest {
     // TODO un-ignore this
@@ -42,7 +40,6 @@ public class BridgeUddWorkerTest {
         // of instantiating all the fields.
         StudyInfo mockStudyInfo = mock(StudyInfo.class);
         AccountInfo mockAccountInfo = mock(AccountInfo.class);
-        List<UploadInfo> mockUploadInfoList = ImmutableList.of();
         PresignedUrlInfo mockPresignedUrlInfo = mock(PresignedUrlInfo.class);
 
         // mock env config - set sleep time to zero so we don't needlessly sleep in unit tests
@@ -69,17 +66,6 @@ public class BridgeUddWorkerTest {
         StormpathHelper mockStormpathHelper = mock(StormpathHelper.class);
         when(mockStormpathHelper.getAccount(same(mockStudyInfo), eq("sqs-user"))).thenReturn(mockAccountInfo);
 
-        // mock dynamo helper again - second call is to get the uploads
-        ArgumentCaptor<BridgeUddRequest> ddbRequestArgCaptor = ArgumentCaptor.forClass(BridgeUddRequest.class);
-        when(mockDynamoHelper.getUploadsForRequest(same(mockAccountInfo), ddbRequestArgCaptor.capture()))
-                .thenReturn(mockUploadInfoList);
-
-        // mock S3 Packager
-        ArgumentCaptor<BridgeUddRequest> s3PackagerRequestArgCaptor = ArgumentCaptor.forClass(BridgeUddRequest.class);
-        S3Packager mockS3Packager = mock(S3Packager.class);
-        when(mockS3Packager.packageFilesForUploadList(s3PackagerRequestArgCaptor.capture(), same(mockUploadInfoList)))
-                .thenReturn(mockPresignedUrlInfo);
-
         // mock SES helper
         SesHelper mockSesHelper = mock(SesHelper.class);
 
@@ -87,7 +73,6 @@ public class BridgeUddWorkerTest {
         BridgeUddWorker testWorker = spy(new BridgeUddWorker());
         testWorker.setDynamoHelper(mockDynamoHelper);
         testWorker.setEnvironmentConfig(mockEnvConfig);
-        testWorker.setS3Packager(mockS3Packager);
         testWorker.setSesHelper(mockSesHelper);
         testWorker.setSqsHelper(mockSqsHelper);
         testWorker.setStormpathHelper(mockStormpathHelper);
@@ -97,16 +82,6 @@ public class BridgeUddWorkerTest {
 
         // execute
         testWorker.run();
-
-        // validate BridgeUddRequest was parsed and passed around correctly
-        BridgeUddRequest ddbRequest = ddbRequestArgCaptor.getValue();
-        assertEquals(ddbRequest.getStudyId(), "test-study");
-        assertEquals(ddbRequest.getUsername(), "sqs-user");
-        assertEquals(ddbRequest.getStartDate().toString(), "2015-08-19");
-        assertEquals(ddbRequest.getEndDate().toString(), "2015-08-21");
-
-        // request sent to DDB is the same object as the one sent to the S3 Packager
-        assertSame(s3PackagerRequestArgCaptor.getValue(), ddbRequest);
 
         // verify SesHelper call
         verify(mockSesHelper).sendPresignedUrlToAccount(same(mockStudyInfo), same(mockPresignedUrlInfo),

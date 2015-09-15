@@ -166,7 +166,6 @@
                             Not worth including these in coverage, since this is entirely copy-pasta, and we're going
                             to refactor it soon.
                         -->
-                        <exclude>org/sagebionetworks/bridge/udd/crypto/*</exclude>
                         <exclude>org/sagebionetworks/bridge/udd/s3/S3Helper.class</exclude>
 
                         <!--

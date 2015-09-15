@@ -14,15 +14,12 @@ import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
 import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.api.ApiKeys;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
 import org.sagebionetworks.client.SynapseAdminClientImpl;
 import org.sagebionetworks.client.SynapseClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -30,9 +27,7 @@ import org.springframework.context.annotation.Configuration;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
-import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
-import org.sagebionetworks.bridge.udd.crypto.CmsEncryptorCacheLoader;
 import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
@@ -45,12 +40,6 @@ public class SpringConfig {
     @Bean(name = "auxiliaryExecutorService")
     public ExecutorService auxiliaryExecutorService() {
         return Executors.newFixedThreadPool(environmentConfig().getInt("threadpool.aux.count"));
-    }
-
-    @Bean(name = "cmsEncryptorCache")
-    @Autowired
-    public LoadingCache<String, CmsEncryptor> cmsEncryptorCache(CmsEncryptorCacheLoader cacheLoader) {
-        return CacheBuilder.newBuilder().build(cacheLoader);
     }
 
     @Bean

@@ -2,6 +2,7 @@ package org.sagebionetworks.bridge.udd.synapse;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -312,16 +313,21 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
      * files to ensure we leave the file system in the state we started it in.
      */
     private void cleanupFiles() {
-        for (File oneFile : ImmutableList.of(ctx.getCsvFile(), ctx.getBulkDownloadFile(), ctx.getEditedCsvFile())) {
-            if (oneFile == null || !fileHelper.exists(oneFile)) {
+        List<File> filesToDelete = new ArrayList<>();
+        filesToDelete.add(ctx.getCsvFile());
+        filesToDelete.add(ctx.getBulkDownloadFile());
+        filesToDelete.add(ctx.getEditedCsvFile());
+
+        for (File oneFileToDelete : filesToDelete) {
+            if (oneFileToDelete == null || !fileHelper.exists(oneFileToDelete)) {
                 // No file. No need to cleanup.
                 continue;
             }
 
             try {
-                fileHelper.deleteFile(oneFile);
+                fileHelper.deleteFile(oneFileToDelete);
             } catch (IOException ex) {
-                LOG.error("Error cleaning up file " + oneFile.getAbsolutePath() + ": " + ex.getMessage(), ex);
+                LOG.error("Error cleaning up file " + oneFileToDelete.getAbsolutePath() + ": " + ex.getMessage(), ex);
             }
         }
     }

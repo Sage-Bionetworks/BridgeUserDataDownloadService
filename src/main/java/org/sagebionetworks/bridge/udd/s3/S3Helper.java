@@ -1,13 +1,17 @@
 package org.sagebionetworks.bridge.udd.s3;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.base.Charsets;
 import com.google.common.io.ByteStreams;
+import org.joda.time.DateTime;
 
 /**
  * Helper class that simplifies reading S3 files. This is generally created by Spring. However, we don't use the
@@ -28,6 +32,10 @@ public class S3Helper {
     /** Convenience method, if consuming classes need to use the S3 client directly for whatever reason. */
     public AmazonS3Client getS3Client() {
         return s3Client;
+    }
+
+    public URL generatePresignedUrl(String bucket, String key, DateTime expiration, HttpMethod httpMethod) {
+        return s3Client.generatePresignedUrl(bucket, key, expiration.toDate(), httpMethod);
     }
 
     /**
@@ -68,5 +76,9 @@ public class S3Helper {
         try (InputStream dataInputStream = new ByteArrayInputStream(data)) {
             s3Client.putObject(bucket, key, dataInputStream, null);
         }
+    }
+
+    public void writeFileToS3(String bucket, String key, File file) {
+        s3Client.putObject(bucket, key, file);
     }
 }
