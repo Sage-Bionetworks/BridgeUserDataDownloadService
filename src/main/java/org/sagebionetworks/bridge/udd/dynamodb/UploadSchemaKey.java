@@ -73,6 +73,8 @@ public final class UploadSchemaKey {
                 throw new IllegalStateException("schemaId must be specified");
             }
 
+            // Zero rev is only meaningful when we are creating a new schema for the first time. Since that never
+            // happens here, we reject zero rev.
             if (revision == null || revision <= 0) {
                 throw new IllegalStateException("revision must be specified and positive");
             }

@@ -3,9 +3,12 @@ package org.sagebionetworks.bridge.udd.helper;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,12 +16,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.base.Charsets;
-
 // mock file helper - store files in an in-memory map
 public class MockFileHelper extends FileHelper {
     private final Set<String> dirSet = new HashSet<>();
     private final Map<String, byte[]> fileMap = new HashMap<>();
+
+    // CREATE
 
     @Override
     public File createTempDir() {
@@ -29,32 +32,6 @@ public class MockFileHelper extends FileHelper {
         // For the purposes of our test, the tmp dir is at the "root" of our mock file system, so the absolute path
         // and the name are both the dir name.
         return makeMockFile(tmpDirName, tmpDirName);
-    }
-
-    @Override
-    public void deleteDir(File dir) {
-        String dirPath = dir.getAbsolutePath();
-        if (!dirSet.contains(dirPath)) {
-            throw new IllegalArgumentException("Can't deleted dir " + dirPath + ": dir doesn't exist");
-        }
-        dirSet.remove(dirPath);
-    }
-
-    @Override
-    public void deleteFile(File file) {
-        String filePath = file.getAbsolutePath();
-        if (!fileMap.containsKey(filePath)) {
-            throw new IllegalArgumentException("Can't delete file " + filePath + ": file doesn't exist");
-        }
-        fileMap.remove(filePath);
-    }
-
-    @Override
-    public OutputStream getOutputStream(File file) {
-        // No need to check if the file exists, because like the real file system, the file won't be created until
-        // you write.
-        String filePath = file.getAbsolutePath();
-        return new FileHelperOutputStream(filePath);
     }
 
     @Override
@@ -70,38 +47,65 @@ public class MockFileHelper extends FileHelper {
         return makeMockFile(parentDirPath + "/" + filename, filename);
     }
 
+    // READ
+
     @Override
-    public void writeBytesToFile(byte[] from, File to) {
+    public InputStream getInputStream(File file) throws FileNotFoundException {
+        return new ByteArrayInputStream(getBytes(file));
+    }
+
+    // WRITE
+
+    @Override
+    public OutputStream getOutputStream(File file) {
         // No need to check if the file exists, because like the real file system, the file won't be created until
         // you write.
-        String toPath = to.getAbsolutePath();
-        fileMap.put(toPath, from);
+        String filePath = file.getAbsolutePath();
+        return new FileHelperOutputStream(filePath);
+    }
+
+    // DELETE
+
+    @Override
+    public void deleteDir(File dir) throws FileNotFoundException {
+        String dirPath = dir.getAbsolutePath();
+        if (!dirSet.contains(dirPath)) {
+            throw new FileNotFoundException("Can't deleted dir " + dirPath + ": dir doesn't exist");
+        }
+        dirSet.remove(dirPath);
     }
 
     @Override
-    public void writeFileToStream(File from, OutputStream to) throws IOException {
+    public void deleteFile(File file) throws FileNotFoundException {
+        String filePath = file.getAbsolutePath();
+        if (!fileMap.containsKey(filePath)) {
+            throw new FileNotFoundException("Can't delete file " + filePath + ": file doesn't exist");
+        }
+        fileMap.remove(filePath);
+    }
+
+    // MISC
+
+    @Override
+    public boolean fileExists(File file) {
+        return fileMap.containsKey(file.getAbsolutePath());
+    }
+
+    @Override
+    public void moveFiles(File from, File to) throws FileNotFoundException {
         String fromPath = from.getAbsolutePath();
         if (!fileMap.containsKey(fromPath)) {
-            throw new IllegalArgumentException("Can't write file " + fromPath + " to stream: file doesn't exist");
+            throw new FileNotFoundException("Can't move file " + fromPath + ": file doesn't exist");
         }
-
-        byte[] fromBytes = fileMap.get(fromPath);
-        to.write(fromBytes);
-    }
-
-    @Override
-    public void writeStringToFile(String from, File to) throws IOException {
-        // No need to check if the file exists, because like the real file system, the file won't be created until
-        // you write.
-        String toPath = to.getAbsolutePath();
-        fileMap.put(toPath, from.getBytes(Charsets.UTF_8));
+        byte[] fromBytes = fileMap.remove(fromPath);
+        fileMap.put(to.getAbsolutePath(), fromBytes);
     }
 
     // helper method to support tests
-    public byte[] getBytes(File file) {
+    public byte[] getBytes(File file) throws FileNotFoundException {
         String filePath = file.getAbsolutePath();
         if (!fileMap.containsKey(filePath)) {
-            throw new IllegalArgumentException("Can't get bytes for file " + filePath + ": file doesn't exist");
+            throw new FileNotFoundException("Can't get bytes for file " + filePath + ": file doesn't exist");
         }
 
         return fileMap.get(filePath);

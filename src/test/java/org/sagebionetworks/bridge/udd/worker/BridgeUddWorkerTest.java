@@ -14,7 +14,6 @@ import java.util.List;
 
 import com.amazonaws.services.sqs.model.Message;
 import com.google.common.collect.ImmutableList;
-import org.junit.Ignore;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
@@ -29,8 +28,7 @@ import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 
 public class BridgeUddWorkerTest {
     // TODO un-ignore this
-    @Test
-    @Ignore
+    @Test(enabled = false)
     public void test() throws Exception {
         // Overall test strategy: 2 loop iterations.
         // #1 - No SQS response, to test that we handle this.

@@ -2,6 +2,7 @@ package org.sagebionetworks.bridge.udd.synapse;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Writer;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -112,7 +113,8 @@ public class SynapsePackager {
         File tmpDir = fileHelper.createTempDir();
 
         // create and execute Synapse downloads asynchronously
-        List<Future<List<File>>> taskFutureList = initAsyncTasks(synapseToSchemaMap, healthCode, request, tmpDir);
+        List<Future<SynapseDownloadFromTableResult>> taskFutureList = initAsyncTasks(synapseToSchemaMap, healthCode,
+                request, tmpDir);
         List<File> allFileList = waitForAsyncTasks(tmpDir, taskFutureList);
 
         if (allFileList.isEmpty()) {
@@ -121,25 +123,39 @@ public class SynapsePackager {
             return null;
         }
 
-        // Zip up all upload files. Filename is "userdata-[startDate]-to-[endDate]-[random guid].zip". This allows the
-        // filename to be unique, user-friendly, and contain no identifying info.
-        String masterZipFilename = "userdata-" + request.getStartDate() + "-to-" + request.getEndDate() + "-" +
-                UUID.randomUUID().toString() + ".zip";
-        File masterZipFile = zipFiles(tmpDir, allFileList, masterZipFilename);
+        File masterZipFile = null;
+        try {
+            // Zip up all upload files. Filename is "userdata-[startDate]-to-[endDate]-[random guid].zip". This allows
+            // the filename to be unique, user-friendly, and contain no identifying info.
+            String masterZipFileName = "userdata-" + request.getStartDate() + "-to-" + request.getEndDate() + "-" +
+                    UUID.randomUUID().toString() + ".zip";
+            masterZipFile = fileHelper.newFile(tmpDir, masterZipFileName);
+            zipFiles(allFileList, masterZipFile);
 
-        uploadToS3(masterZipFilename, masterZipFile);
-        PresignedUrlInfo presignedUrlInfo = generatePresignedUrlInfo(masterZipFilename);
-
-        cleanupFiles(allFileList, masterZipFile, tmpDir);
-
-        return presignedUrlInfo;
+            uploadToS3(masterZipFile);
+            return generatePresignedUrlInfo(masterZipFileName);
+        } finally {
+            cleanupFiles(allFileList, masterZipFile, tmpDir);
+        }
     }
 
-    // TODO doc
-    // create async threads to download CSVs
-    private List<Future<List<File>>> initAsyncTasks(Map<String, UploadSchema> synapseToSchemaMap, String healthCode,
-            BridgeUddRequest request, File tmpDir) {
-        List<Future<List<File>>> taskFutureList = new ArrayList<>();
+    /**
+     * Kicks off the async SynapseDownloadFromTableTasks. These tasks query the Synapse table and download both the
+     * CSV and the bulk download for attached file handles.
+     *
+     * @param synapseToSchemaMap
+     *         map of all Synapse table IDs in the current study and their corresponding schemas
+     * @param healthCode
+     *         user's health code, used for generating queries
+     * @param request
+     *         Bridge UDD request, used to get the start and end date
+     * @param tmpDir
+     *         temp directory that files should be downloaded to
+     * @return list of Futures for the async tasks
+     */
+    private List<Future<SynapseDownloadFromTableResult>> initAsyncTasks(Map<String, UploadSchema> synapseToSchemaMap,
+            String healthCode, BridgeUddRequest request, File tmpDir) {
+        List<Future<SynapseDownloadFromTableResult>> taskFutureList = new ArrayList<>();
         for (Map.Entry<String, UploadSchema> oneSynapseToSchemaEntry : synapseToSchemaMap.entrySet()) {
             // create params
             String synapseTableId = oneSynapseToSchemaEntry.getKey();
@@ -151,22 +167,42 @@ public class SynapsePackager {
 
             // kick off async task
             SynapseDownloadFromTableTask downloadCsvTask = newDownloadCsvTask(param);
-            Future<List<File>> downloadCsvTaskFuture = auxiliaryExecutorService.submit(downloadCsvTask);
+            Future<SynapseDownloadFromTableResult> downloadCsvTaskFuture = auxiliaryExecutorService.submit(
+                    downloadCsvTask);
             taskFutureList.add(downloadCsvTaskFuture);
         }
 
         return taskFutureList;
     }
 
-    // TODO doc
-    private List<File> waitForAsyncTasks(File tmpDir, List<Future<List<File>>> taskFutureList) throws IOException {
+    /**
+     * Waits on the async tasks, then gathers up all the files downloaded. This also writes a log with error messages
+     * for each failed async task.
+     *
+     * @param tmpDir
+     *         temp directory files should be downloaded to and error log should be written to
+     * @param taskFutureList
+     *         list of Futures for async tasks that should be waited on
+     * @return list of all files downloaded, plus error log
+     * @throws IOException
+     *         if writing the error log fails
+     */
+    private List<File> waitForAsyncTasks(File tmpDir, List<Future<SynapseDownloadFromTableResult>> taskFutureList)
+            throws IOException {
         // join on threads until they're all done
         List<File> allFileList = new ArrayList<>();
         List<String> errorList = new ArrayList<>();
-        for (Future<List<File>> oneTaskFuture : taskFutureList) {
+        for (Future<SynapseDownloadFromTableResult> oneTaskFuture : taskFutureList) {
             try {
-                List<File> taskFileList = oneTaskFuture.get();
-                allFileList.addAll(taskFileList);
+                SynapseDownloadFromTableResult taskResult = oneTaskFuture.get();
+
+                if (taskResult.getCsvFile() != null) {
+                    allFileList.add(taskResult.getCsvFile());
+                }
+
+                if (taskResult.getBulkDownloadFile() != null) {
+                    allFileList.add(taskResult.getBulkDownloadFile());
+                }
             } catch (ExecutionException | InterruptedException ex) {
                 String errorMsg = "Error downloading CSV: " + ex.getMessage();
                 LOG.error(errorMsg, ex);
@@ -178,15 +214,27 @@ public class SynapsePackager {
         if (!errorList.isEmpty()) {
             String errorLog = LINE_JOINER.join(errorList);
             File errorLogFile = fileHelper.newFile(tmpDir, "error.log");
-            fileHelper.writeStringToFile(errorLog, errorLogFile);
+
+            try (Writer errorLogFileWriter = fileHelper.getWriter(errorLogFile)) {
+                errorLogFileWriter.write(errorLog);
+            }
+
             allFileList.add(errorLogFile);
         }
         return allFileList;
     }
 
-    // TODO doc
-    private File zipFiles(File tmpDir, List<File> allFileList, String masterZipFilename) throws IOException {
-        File masterZipFile = fileHelper.newFile(tmpDir, masterZipFilename);
+    /**
+     * Helper method that calls through to ZipHelper. This also adds timing metrics and logging.
+     *
+     * @param allFileList
+     *         list of files to zip up
+     * @param masterZipFile
+     *         file to zip to
+     * @throws IOException
+     *         if zipping the files fails
+     */
+    private void zipFiles(List<File> allFileList, File masterZipFile) throws IOException {
         Stopwatch zipStopwatch = Stopwatch.createStarted();
         try {
             zipHelper.zip(allFileList, masterZipFile);
@@ -195,15 +243,19 @@ public class SynapsePackager {
             LOG.info("Zipping to file " + masterZipFile.getAbsolutePath() + " took " +
                     zipStopwatch.elapsed(TimeUnit.MILLISECONDS) + " ms");
         }
-        return masterZipFile;
     }
 
-    // TODO doc
-    private void uploadToS3(String masterZipFilename, File masterZipFile) {
+    /**
+     * Helper method that calls through to the S3Helper. This also adds timing metrics and logging.
+     *
+     * @param masterZipFile
+     *         zip file to upload to S3
+     */
+    private void uploadToS3(File masterZipFile) {
         // upload to S3
         Stopwatch uploadToS3Stopwatch = Stopwatch.createStarted();
         try {
-            s3Helper.writeFileToS3(userdataBucketName, masterZipFilename, masterZipFile);
+            s3Helper.writeFileToS3(userdataBucketName, masterZipFile.getName(), masterZipFile);
         } finally {
             uploadToS3Stopwatch.stop();
             LOG.info("Uploading file " + masterZipFile.getAbsolutePath() + " to S3 took " +
@@ -211,7 +263,13 @@ public class SynapsePackager {
         }
     }
 
-    // TODO doc
+    /**
+     * Generate the pre-signed URL for the master zip file.
+     *
+     * @param masterZipFilename
+     *         master zip file name
+     * @return pre-signed URL info, including the actual URL and the expiration time.
+     */
     private PresignedUrlInfo generatePresignedUrlInfo(String masterZipFilename) {
         // Get pre-signed URL for download. This URL expires after a number of hours, defined by configuration.
         DateTime expirationTime = now().plusHours(urlExpirationHours);
@@ -220,19 +278,35 @@ public class SynapsePackager {
         return new PresignedUrlInfo.Builder().withUrl(presignedUrl).withExpirationTime(expirationTime).build();
     }
 
-    // TODO doc
+    /**
+     * Cleans up all the files we wrote for the given run. If the files are null or don't exist, skip them.
+     *
+     * @param allFileList
+     *         list of files returned by the async tasks
+     * @param masterZipFile
+     *         master zip file, zip of the files returned by the async tasks
+     * @param tmpDir
+     *         temp dir containing all these files, obviously deleted last
+     */
     private void cleanupFiles(List<File> allFileList, File masterZipFile, File tmpDir) {
         // cleanup files
         List<File> filesToDelete = new ArrayList<>();
         filesToDelete.addAll(allFileList);
         filesToDelete.add(masterZipFile);
         for (File oneFileToDelete : filesToDelete) {
+            if (oneFileToDelete == null || !fileHelper.fileExists(oneFileToDelete)) {
+                // No file. No need to cleanup.
+                continue;
+            }
+
             try {
                 fileHelper.deleteFile(oneFileToDelete);
             } catch (IOException ex) {
                 LOG.error("Error deleting file " + oneFileToDelete.getAbsolutePath());
             }
         }
+
+        // clean up temp dir
         try {
             fileHelper.deleteDir(tmpDir);
         } catch (IOException ex) {
@@ -240,11 +314,17 @@ public class SynapsePackager {
         }
     }
 
-    // Creates a SynapseDownloadCsvFromTableTask. This is a member method, so we can mock out task execution in unit
-    // tests. This is package-scoped to make it available to unit tests.
-    //
-    // We use a factory method here instead of using Spring, because Spring can't be mocked and we need to create
-    // multiple copies of the synapse task.
+    /**
+     * <p>
+     * Creates a SynapseDownloadCsvFromTableTask. This is a member method, so we can mock out task execution in unit
+     * tests. This is package-scoped to make it available to unit tests.
+     * </p>
+     * <p>
+     * We use a factory method here instead of using Spring, because Spring can't be mocked and we need to create
+     * multiple copies of the synapse task.
+     * </p>
+     */
+    // TODO: We prolly don't have to mock this, since we mock the executor service.
     SynapseDownloadFromTableTask newDownloadCsvTask(SynapseDownloadFromTableParameters param) {
         SynapseDownloadFromTableTask task = new SynapseDownloadFromTableTask(param);
         task.setFileHelper(fileHelper);
@@ -252,8 +332,10 @@ public class SynapsePackager {
         return task;
     }
 
-    // Helper method which returns "now". This is moved into a member method to enable mocking and is package-scoped to
-    // make it available to unit tests.
+    /**
+     * Helper method which returns "now". This is moved into a member method to enable mocking and is package-scoped to
+     * make it available to unit tests.
+     */
     DateTime now() {
         return DateTime.now();
     }

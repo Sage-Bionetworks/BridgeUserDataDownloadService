@@ -162,6 +162,9 @@
                         <!-- config is inherently not testable -->
                         <exclude>org/sagebionetworks/bridge/udd/config/*</exclude>
 
+                        <!-- no point in testing exceptions, since they are entirely boilerplate code -->
+                        <exclude>org/sagebionetworks/bridge/udd/exceptions/*</exclude>
+
                         <!--
                             Not worth including these in coverage, since this is entirely copy-pasta, and we're going
                             to refactor it soon.

@@ -1,5 +1,6 @@
 package org.sagebionetworks.bridge.udd.synapse;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,7 +14,6 @@ import java.util.concurrent.TimeUnit;
 import au.com.bytecode.opencsv.CSVWriter;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileDownloadSummary;
@@ -27,19 +27,20 @@ import org.sagebionetworks.bridge.udd.exceptions.AsyncTimeoutException;
 import org.sagebionetworks.bridge.udd.helper.FileHelper;
 
 /**
- * A one-shot asynchronous task to query a Synapse table and download the CSV. This task returns the list of files
+ * A one-shot asynchronous task to query a Synapse table and download the CSV. This task returns the struct of files
  * downloaded. This includes the CSV (if the query pulls data from the table) and a ZIP with the attached file handles
  * (if there are any).
  */
-public class SynapseDownloadFromTableTask implements Callable<List<File>> {
+public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFromTableResult> {
     private static final Logger LOG = LoggerFactory.getLogger(SynapseDownloadFromTableTask.class);
 
-    private static final String ERROR_DOWNLOADING_ATTACHMENT = "Error downloading attachment";
+    private static final String COL_HEALTH_CODE = "healthCode";
+    private static final String ERROR_DOWNLOADING_ATTACHMENT = "Unknown error downloading attachment";
     private static final String QUERY_TEMPLATE =
             "SELECT * FROM %s WHERE healthCode = '%s' AND uploadDate >= '%s' AND uploadDate <= '%s'";
 
     // Task parameters. Params is passed in by constructor. Context is created by this task.
-    private final SynapseDownloadFromTableParameters param;
+    private final SynapseDownloadFromTableParameters params;
     private final SynapseDownloadFromTableContext ctx = new SynapseDownloadFromTableContext();
 
     // Helpers and config objects. Originates from Spring configs and is passed in through setters using a similar
@@ -49,10 +50,12 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
 
     /**
      * Constructs this task with the specified task parameters
-     * @param param task parameters
+     *
+     * @param params
+     *         task parameters
      */
-    public SynapseDownloadFromTableTask(SynapseDownloadFromTableParameters param) {
-        this.param = param;
+    public SynapseDownloadFromTableTask(SynapseDownloadFromTableParameters params) {
+        this.params = params;
     }
 
     /**
@@ -63,18 +66,24 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         this.fileHelper = fileHelper;
     }
 
-    /** Synapse helper. */
+    /** Synapse helper, used to download CSV and bulk file download from Synapse. */
     public final void setSynapseHelper(SynapseHelper synapseHelper) {
         this.synapseHelper = synapseHelper;
     }
 
+    /**
+     * Executes the SynapseDownloadFromTableTask. Returns the list of files downloaded. These files all live in the
+     * temp directory passed in from the task parameters.
+     *
+     * @return list of files downloaded
+     */
     @Override
-    public List<File> call() {
+    public SynapseDownloadFromTableResult call() {
         try {
             downloadCsv();
             if (filterNoDataCsvFiles()) {
-                // return an empty list, to signify no data
-                return ImmutableList.of();
+                // return an empty result, to signify no data
+                return new SynapseDownloadFromTableResult.Builder().build();
             }
             getColumnInfoFromCsv();
 
@@ -95,7 +104,8 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
 
             editCsv();
 
-            return ImmutableList.of(ctx.getCsvFile(), ctx.getBulkDownloadFile());
+            return new SynapseDownloadFromTableResult.Builder().withCsvFile(ctx.getCsvFile())
+                    .withBulkDownloadFile(ctx.getBulkDownloadFile()).build();
         } catch (RuntimeException ex) {
             // Cleanup files. No need to leave garbage behind.
             cleanupFiles();
@@ -103,16 +113,20 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
+    /**
+     * Queries a Synapse table based on the params and downloads the result as a CSV. This method reads all params
+     * (except schema) from {@link SynapseDownloadFromTableParameters} to generate the query and writes the resulting
+     * CSV to {@link SynapseDownloadFromTableContext#setCsvFile}.
+     */
     private void downloadCsv() {
-        String synapseTableId = param.getSynapseTableId();
-        File csvFile = fileHelper.newFile(param.getTempDir(), param.getSchema().getKey().toString() + ".csv");
+        String synapseTableId = params.getSynapseTableId();
+        File csvFile = fileHelper.newFile(params.getTempDir(), params.getSchema().getKey().toString() + ".csv");
         String csvFilePath = csvFile.getAbsolutePath();
 
         Stopwatch downloadCsvStopwatch = Stopwatch.createStarted();
         try {
-            String query = String.format(QUERY_TEMPLATE, synapseTableId, param.getHealthCode(), param.getStartDate(),
-                    param.getEndDate());
+            String query = String.format(QUERY_TEMPLATE, synapseTableId, params.getHealthCode(), params.getStartDate(),
+                    params.getEndDate());
             String csvFileHandleId = synapseHelper.generateFileHandleFromTableQuery(query, synapseTableId);
             synapseHelper.downloadFileHandle(csvFileHandleId, csvFile);
             ctx.setCsvFile(csvFile);
@@ -126,11 +140,31 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
+    /**
+     * <p>
+     * Sometimes, a Synapse table contains no data for the given user and time range. This method counts the lines in
+     * the file to determine if that is the case. If there aren't at least 2 lines (header row plus at least one data
+     * row), we filter out the file. (The actual filtering is done by the caller. We simply return true if we should
+     * filter.)
+     * </p>
+     * <p>
+     * This method reads from {@link SynapseDownloadFromTableContext#getCsvFile} and doesn't write anything back to
+     * the context.
+     * </p>
+     *
+     * @return true if the file should be filtered because there's no user data
+     */
     private boolean filterNoDataCsvFiles() {
-        List<String> lineList;
-        try {
-            lineList = fileHelper.readLines(ctx.getCsvFile());
+        int numLines = 0;
+        try (BufferedReader csvFileReader = fileHelper.getReader(ctx.getCsvFile())) {
+            while (csvFileReader.readLine() != null) {
+                numLines++;
+                if (numLines >= 2) {
+                    // We only need to read 2 lines (1 header, 1 user data). Now that we've read 2 lines, we can
+                    // short-circuit
+                    break;
+                }
+            }
         } catch (IOException ex) {
             throw new AsyncTaskExecutionException("Error counting lines for file " + ctx.getCsvFilePath() + ": " +
                     ex.getMessage(), ex);
@@ -138,7 +172,7 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
 
         // If there aren't at least 2 lines (1 line headers, 1+ lines of data), then filter out the file, since we
         // don't need it. Don't log or throw, since this could be a normal case.
-        if (lineList.size() < 2) {
+        if (numLines < 2) {
             LOG.info("No user data found for file " + ctx.getCsvFilePath() + ". Short-circuiting.");
 
             // cleanup files, since there's no data to keep around anyway
@@ -150,9 +184,12 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
-    // Get file handle column indexes. This will tell us if we need to download file handles and inject the paths
-    // into the CSV
+    /**
+     * Get file handle column indexes. This will tell us if we need to download file handles and inject the paths
+     * into the CSV. This method reads from {@link SynapseDownloadFromTableParameters#getSchema} and
+     * {@link SynapseDownloadFromTableContext#getCsvFile} and writes the results to
+     * {@link SynapseDownloadFromTableContext#setColumnInfo}.
+     */
     private void getColumnInfoFromCsv() {
         try (CsvNullReader csvFileReader = new CsvNullReader(fileHelper.getReader(ctx.getCsvFile()))) {
             // Get first row, the header row. Because of our previous check, we know this row must exist.
@@ -160,10 +197,10 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
 
             // Iterate through the headers. Identify relevant fields.
             SynapseTableColumnInfo.Builder colInfoBuilder = new SynapseTableColumnInfo.Builder();
-            Map<String, String> fieldTypeMap = param.getSchema().getFieldTypeMap();
+            Map<String, String> fieldTypeMap = params.getSchema().getFieldTypeMap();
             for (int i = 0; i < headerRow.length; i++) {
                 String oneFieldName = headerRow[i];
-                if ("healthCode".equals(oneFieldName)) {
+                if (COL_HEALTH_CODE.equals(oneFieldName)) {
                     // Health code. Definitely not file handle ID.
                     colInfoBuilder.withHealthCodeColumnIndex(i);
                 } else {
@@ -180,7 +217,11 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
+    /**
+     * This method extracts file handle IDs from the CSV file. This method reads from
+     * {@link SynapseDownloadFromTableContext#getCsvFile} and {@link SynapseDownloadFromTableContext#getColumnInfo} and
+     * writes the results to {@link SynapseDownloadFromTableContext#addFileHandleIds}.
+     */
     private void extractFileHandleIdsFromCsv() {
         Set<Integer> fileHandleColIdxSet = ctx.getColumnInfo().getFileHandleColumnIndexSet();
 
@@ -209,16 +250,25 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
+    /**
+     * This method takes the set of file handle IDs and bulk downloads them from Synapse (using the bulk download API).
+     * This method reads from {@link SynapseDownloadFromTableParameters#getTempDir} to determine download location,
+     * {@link SynapseDownloadFromTableParameters#getSchema} to generate the zip file name,
+     * {@link SynapseDownloadFromTableParameters#getSynapseTableId}, and
+     * {@link SynapseDownloadFromTableContext#getFileHandleIdSet}, and writes the results to
+     * {@link SynapseDownloadFromTableContext#setFileSummaryList} and
+     * {@link SynapseDownloadFromTableContext#setBulkDownloadFile}.
+     */
     private void bulkDownloadFileHandles() {
         // download file handles
-        File bulkDownloadFile = fileHelper.newFile(param.getTempDir(), param.getSchema().getKey().toString() + ".zip");
+        File bulkDownloadFile = fileHelper.newFile(params.getTempDir(), params.getSchema().getKey().toString() +
+                ".zip");
         String bulkDownloadFilePath = bulkDownloadFile.getAbsolutePath();
 
         Stopwatch bulkDownloadStopwatch = Stopwatch.createStarted();
         BulkFileDownloadResponse bulkDownloadResponse;
         try {
-            bulkDownloadResponse = synapseHelper.generateBulkDownloadFileHandle(param.getSynapseTableId(),
+            bulkDownloadResponse = synapseHelper.generateBulkDownloadFileHandle(params.getSynapseTableId(),
                     ctx.getFileHandleIdSet());
             ctx.setFileSummaryList(bulkDownloadResponse.getFileSummary());
 
@@ -235,26 +285,45 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
         }
     }
 
-    // TODO doc
-    // We need to make edits to the CSV. (1) Replace the file handle IDs with zip entry names. (2) Remove health
-    // codes, since those aren't supposed to be exposed to users.
-    private void editCsv() {
+    /**
+     * <p>
+     * We need to make edits to the CSV: (1) Replace the file handle IDs with zip entry names. (2) Remove health
+     * codes, since those aren't supposed to be exposed to users. This method reads from
+     * {@link SynapseDownloadFromTableParameters#getTempDir} to determine where to write the edited CSV and from
+     * {@link SynapseDownloadFromTableParameters#getSchema} to generate the edited CSV file name. It also reads from
+     * {@link SynapseDownloadFromTableContext#getFileSummaryList},
+     * {@link SynapseDownloadFromTableContext#getColumnInfo}, {@link SynapseDownloadFromTableContext#getCsvFile}, and
+     * writes the results to {@link SynapseDownloadFromTableContext#setEditedCsvFile}.
+     * </p>
+     * <p>
+     * This method is package-scoped, to allow unit tests to inject an exception here.
+     * </p>
+     */
+    void editCsv() {
         // Convert file summary in bulk download response into a map from file handle ID to zip entry name.
-        Map<String, String> fileHandleIdToZipEntryName = new HashMap<>();
+        Map<String, String> fileHandleIdToReplacement = new HashMap<>();
         List<FileDownloadSummary> fileSummaryList = ctx.getFileSummaryList();
-        if (fileSummaryList != null && !fileSummaryList.isEmpty()) {
+        if (fileSummaryList != null) {
             for (FileDownloadSummary oneFileSummary : fileSummaryList) {
                 String fileHandleId = oneFileSummary.getFileHandleId();
-                String zipEntryName = oneFileSummary.getZipEntryName();
-                if (!Strings.isNullOrEmpty(fileHandleId) && !Strings.isNullOrEmpty(zipEntryName)) {
-                    fileHandleIdToZipEntryName.put(fileHandleId, zipEntryName);
+                if (!Strings.isNullOrEmpty(fileHandleId)) {
+                    String zipEntryName = oneFileSummary.getZipEntryName();
+                    String failureMessage = oneFileSummary.getFailureMessage();
+
+                    if (!Strings.isNullOrEmpty(zipEntryName)) {
+                        // replace file handle ID with zip entry name
+                        fileHandleIdToReplacement.put(fileHandleId, zipEntryName);
+                    } else if (!Strings.isNullOrEmpty(failureMessage)) {
+                        // replace file handle ID with error message
+                        fileHandleIdToReplacement.put(fileHandleId, failureMessage);
+                    }
                 }
             }
         }
 
         int healthCodeIdx = ctx.getColumnInfo().getHealthCodeColumnIndex();
         Set<Integer> fileHandleColIdxSet = ctx.getColumnInfo().getFileHandleColumnIndexSet();
-        File editedCsvFile = fileHelper.newFile(param.getTempDir(), param.getSchema().getKey().toString() +
+        File editedCsvFile = fileHelper.newFile(params.getTempDir(), params.getSchema().getKey().toString() +
                 "-edited.csv");
         String editedCsvFilePath = editedCsvFile.getAbsolutePath();
         ctx.setEditedCsvFile(editedCsvFile);
@@ -279,9 +348,9 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
                         continue;
                     }
 
-                    String zipEntryName = fileHandleIdToZipEntryName.get(fileHandleId);
-                    if (!Strings.isNullOrEmpty(zipEntryName)) {
-                        row[oneFileHandleColIdx] = zipEntryName;
+                    String replacement = fileHandleIdToReplacement.get(fileHandleId);
+                    if (!Strings.isNullOrEmpty(replacement)) {
+                        row[oneFileHandleColIdx] = replacement;
                     } else {
                         row[oneFileHandleColIdx] = ERROR_DOWNLOADING_ATTACHMENT;
                     }
@@ -301,7 +370,7 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
 
         // rename editedCsvFile into csvFile, replacing the original csvFile
         try {
-            fileHelper.move(editedCsvFile, ctx.getCsvFile());
+            fileHelper.moveFiles(editedCsvFile, ctx.getCsvFile());
         } catch (IOException ex) {
             throw new AsyncTaskExecutionException("Error moving (replacing) file from " + editedCsvFilePath +
                     " to " + ctx.getCsvFilePath() + ": " + ex.getMessage(), ex);
@@ -309,17 +378,25 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
     }
 
     /**
+     * <p>
      * This is called when an error is thrown or if there's no data to download. We'll need to delete all intermediate
-     * files to ensure we leave the file system in the state we started it in.
+     * files to ensure we leave the file system in the state we started it in. The specific intemediate files in
+     * question are {@link SynapseDownloadFromTableContext#getCsvFile},
+     * {@link SynapseDownloadFromTableContext#getBulkDownloadFile},
+     * {@link SynapseDownloadFromTableContext#getEditedCsvFile}, if any/all exist.
+     * </p>
+     * <p>
+     * This is package-scoped to enable unit tests.
+     * </p>
      */
-    private void cleanupFiles() {
+    void cleanupFiles() {
         List<File> filesToDelete = new ArrayList<>();
         filesToDelete.add(ctx.getCsvFile());
         filesToDelete.add(ctx.getBulkDownloadFile());
         filesToDelete.add(ctx.getEditedCsvFile());
 
         for (File oneFileToDelete : filesToDelete) {
-            if (oneFileToDelete == null || !fileHelper.exists(oneFileToDelete)) {
+            if (oneFileToDelete == null || !fileHelper.fileExists(oneFileToDelete)) {
                 // No file. No need to cleanup.
                 continue;
             }
@@ -327,8 +404,18 @@ public class SynapseDownloadFromTableTask implements Callable<List<File>> {
             try {
                 fileHelper.deleteFile(oneFileToDelete);
             } catch (IOException ex) {
-                LOG.error("Error cleaning up file " + oneFileToDelete.getAbsolutePath() + ": " + ex.getMessage(), ex);
+                LOG.error("Error deleting file " + oneFileToDelete.getAbsolutePath());
             }
         }
+    }
+
+    /** Returns the params. Package-scoped to support tests for {@link SynapsePackager}. */
+    SynapseDownloadFromTableParameters getParameters() {
+        return params;
+    }
+
+    /** Returns the context. Package-scoped so unit tests can modify the context for deep testing. */
+    SynapseDownloadFromTableContext getContext() {
+        return ctx;
     }
 }

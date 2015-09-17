@@ -3,11 +3,13 @@ package org.sagebionetworks.bridge.udd.helper;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import com.google.common.base.Charsets;
+import com.google.common.io.ByteStreams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -38,7 +40,11 @@ public class ZipHelper {
             for (File oneFromFile : fromList) {
                 ZipEntry oneZipEntry = new ZipEntry(oneFromFile.getName());
                 zipOutputStream.putNextEntry(oneZipEntry);
-                fileHelper.writeFileToStream(oneFromFile, zipOutputStream);
+
+                try (InputStream fromFileInputStream = fileHelper.getInputStream(oneFromFile)) {
+                    ByteStreams.copy(fromFileInputStream, zipOutputStream);
+                }
+
                 zipOutputStream.closeEntry();
             }
         }

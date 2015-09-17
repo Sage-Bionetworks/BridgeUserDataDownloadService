@@ -25,7 +25,7 @@ public class SynapseDownloadFromTableContext {
         return csvFile;
     }
 
-    /** The absoluate path of the CSV file. */
+    /** The absolute path of the CSV file, used for logging. */
     public String getCsvFilePath() {
         return csvFile.getAbsolutePath();
     }

@@ -29,11 +29,21 @@ public class S3Helper {
         this.s3Client = s3Client;
     }
 
-    /** Convenience method, if consuming classes need to use the S3 client directly for whatever reason. */
-    public AmazonS3Client getS3Client() {
-        return s3Client;
-    }
-
+    /**
+     * Pass through to S3 generate presigned URL. This exists mainly as a convenience, so we can do all S3 operations
+     * through the helper instead of using the S3 client directly for some operations. This also enables us to add
+     * retry logic later.
+     *
+     * @param bucket
+     *         bucket containing the file we want to get a pre-signed URL for
+     * @param key
+     *         key (filename) to get the pre-signed URL for
+     * @param expiration
+     *         expiration date of the pre-signed URL
+     * @param httpMethod
+     *         HTTP method to restrict our pre-signed URL
+     * @return the generated pre-signed URL
+     */
     public URL generatePresignedUrl(String bucket, String key, DateTime expiration, HttpMethod httpMethod) {
         return s3Client.generatePresignedUrl(bucket, key, expiration.toDate(), httpMethod);
     }
@@ -72,12 +82,36 @@ public class S3Helper {
         return new String(bytes, Charsets.UTF_8);
     }
 
+    /**
+     * Upload the given bytes as an S3 file to S3.
+     *
+     * @param bucket
+     *         bucket to upload to
+     * @param key
+     *         key (filename) to upload to
+     * @param data
+     *         bytes to upload
+     * @throws IOException
+     *         if uploading the byte stream fails
+     */
     public void writeBytesToS3(String bucket, String key, byte[] data) throws IOException {
         try (InputStream dataInputStream = new ByteArrayInputStream(data)) {
             s3Client.putObject(bucket, key, dataInputStream, null);
         }
     }
 
+    /**
+     * Pass through to S3 PutObject. This exists mainly as a convenience, so we can do all S3 operations through the
+     * helper instead of using the S3 client directly for some operations. This also enables us to add retry logic
+     * later.
+     *
+     * @param bucket
+     *         bucket to upload to
+     * @param key
+     *         key (filename) to upload to
+     * @param file
+     *         file to upload
+     */
     public void writeFileToS3(String bucket, String key, File file) {
         s3Client.putObject(bucket, key, file);
     }

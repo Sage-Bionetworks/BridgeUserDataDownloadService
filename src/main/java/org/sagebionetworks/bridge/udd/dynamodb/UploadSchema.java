@@ -50,6 +50,10 @@ public class UploadSchema {
         // parse key
         String ddbKey = ddbItem.getString("key");
         String[] ddbKeyTokenArray = ddbKey.split(":", 2);
+        if (ddbKeyTokenArray.length != 2) {
+            throw new IllegalArgumentException("Malformed key " + ddbKey);
+        }
+
         String studyId = ddbKeyTokenArray[0];
         String schemaId = ddbKeyTokenArray[1];
         int rev = ddbItem.getInt("revision");

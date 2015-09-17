@@ -75,11 +75,6 @@ public class SpringConfig {
         return ddbClient().getTable(ddbPrefix() + "Upload2");
     }
 
-    @Bean(name = "ddbUploadTableIndex")
-    public Index ddbUploadTableIndex() {
-        return ddbUploadTable().getIndex("healthCode-uploadDate-index");
-    }
-
     @Bean(name = "ddbUploadSchemaTable")
     public Table ddbUploadSchemaTable() {
         return ddbClient().getTable(ddbPrefix() + "UploadSchema");

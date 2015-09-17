@@ -21,10 +21,14 @@ import org.springframework.stereotype.Component;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTimeoutException;
 
-/** Encapsulates calls to Synapse. */
+/** Helper class to Synapse, which wraps Synapse async call patterns.. */
 @Component
 public class SynapseHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SynapseHelper.class);
+
+    // Package-scoped to be available in unit tests
+    static final String CONFIG_KEY_POLL_INTERVAL_MILLIS = "synapse.poll.interval.millis";
+    static final String CONFIG_KEY_POLL_MAX_TRIES = "synapse.poll.max.tries";
 
     private int pollIntervalMillis;
     private int pollMaxTries;
@@ -33,8 +37,8 @@ public class SynapseHelper {
     /** Bridge config. This is used to get poll intervals and retry timeouts. */
     @Autowired
     public void setConfig(Config config) {
-        pollIntervalMillis = config.getInt("synapse.poll.interval.millis");
-        pollMaxTries = config.getInt("synapse.poll.max.tries");
+        pollIntervalMillis = config.getInt(CONFIG_KEY_POLL_INTERVAL_MILLIS);
+        pollMaxTries = config.getInt(CONFIG_KEY_POLL_MAX_TRIES);
     }
 
     /** Synapse client. */
@@ -43,14 +47,36 @@ public class SynapseHelper {
         this.synapseClient = synapseClient;
     }
 
-    // TODO doc
-    // TODO retries
+    /**
+     * Convenience method that downloads the given file handle to the given target file. This exists mainly so all
+     * Synapse calls go through the helper, instead of forcing callers to sometimes use the helper and sometimes use
+     * the client. This also enables retry logic.
+     *
+     * @param fileHandleId
+     *         file handle ID to download
+     * @param targetFile
+     *         local file to download to
+     * @throws SynapseException
+     *         if calling Synapse fails
+     */
     public void downloadFileHandle(String fileHandleId, File targetFile) throws SynapseException {
         synapseClient.downloadFromFileHandleTemporaryUrl(fileHandleId, targetFile);
     }
 
-    // TODO doc
-    // TODO retries
+    /**
+     * Bulk downloads the specified file handles for the specified table. This returns a BulkFileDownloadResponse,
+     * which contains a file handle ID that must then be downloaded separately.
+     *
+     * @param synapseTableId
+     *         Synapse table associated with the file handles
+     * @param fileHandleIdSet
+     *         file handle IDs to download
+     * @return bulk download API response
+     * @throws AsyncTimeoutException
+     *         if the async call to Synapse times out, according to the config settings
+     * @throws SynapseException
+     *         if the Synapse call fails
+     */
     public BulkFileDownloadResponse generateBulkDownloadFileHandle(String synapseTableId, Set<String> fileHandleIdSet)
             throws AsyncTimeoutException, SynapseException {
         // Need to create file handle association objects as part of the request.
@@ -95,8 +121,19 @@ public class SynapseHelper {
         return response;
     }
 
-    // TODO doc
-    // TODO retries
+    /**
+     * Queries a Synapse table and returns the results as a CSV file handle.
+     *
+     * @param query
+     *         query to run
+     * @param synapseTableId
+     *         table to query against
+     * @return file handle ID of the results in CSV form
+     * @throws AsyncTimeoutException
+     *         if the async call to Synapse times out, according to the config settings
+     * @throws SynapseException
+     *         if the Synapse call fails
+     */
     public String generateFileHandleFromTableQuery(String query, String synapseTableId) throws AsyncTimeoutException,
             SynapseException {
         // Kick off async call.

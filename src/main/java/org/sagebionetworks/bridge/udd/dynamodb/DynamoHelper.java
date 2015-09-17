@@ -15,16 +15,12 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.springframework.stereotype.Component;
 
-import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
-import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
-
 /** Helper class to wrap some Dynamo DB queries we make. */
 @Component
 public class DynamoHelper {
     private Table ddbHealthIdTable;
     private Table ddbStudyTable;
     private Table ddbSynapseMapTable;
-    private Index ddbUploadTableIndex;
     private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
 
@@ -44,12 +40,6 @@ public class DynamoHelper {
     @Resource(name = "ddbSynapseMapTable")
     public final void setDdbSynapseMapTable(Table ddbSynapseMapTable) {
         this.ddbSynapseMapTable = ddbSynapseMapTable;
-    }
-
-    /** Upload table healthCode-uploadDate-index. */
-    @Resource(name = "ddbUploadTableIndex")
-    public final void setDdbUploadTableIndex(Index ddbUploadTableIndex) {
-        this.ddbUploadTableIndex = ddbUploadTableIndex;
     }
 
     /** Upload schema table. */
@@ -123,6 +113,12 @@ public class DynamoHelper {
         Multimap<String, UploadSchema> synapseToSchemaMultimap = HashMultimap.create();
         for (UploadSchema oneSchema : schemaList) {
             Item synapseMapRecord = ddbSynapseMapTable.getItem("schemaKey", oneSchema.getKey().toString());
+            if (synapseMapRecord == null) {
+                // This could happen if the schema was just created, but the Bridge-Exporter hasn't created the
+                // corresponding Synapse table yet. If so, there's obviously no data. Skip this one.
+                continue;
+            }
+
             String synapseTableId = synapseMapRecord.getString("tableId");
             synapseToSchemaMultimap.put(synapseTableId, oneSchema);
         }

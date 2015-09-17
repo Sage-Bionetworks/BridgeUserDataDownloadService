@@ -46,10 +46,9 @@ public class SesHelper {
             "       </p>\n" +
             "   </body>\n" +
             "</html>";
-    private static final String NO_DATA_BODY_TEXT =
-            "There was no data available for your request. Data will only be available if your sharing\n" +
-                    "settings are set to share data. Please check your sharing settings and please wait at\n" +
-                    "least 24 hours for data to finish processing.";
+    private static final String NO_DATA_BODY_TEXT = "There was no data available for your request. Data will only be available if your sharing\n" +
+            "settings are set to share data. Please check your sharing settings and please wait at\n" +
+            "least 24 hours for data to finish processing.";
 
     private AmazonSimpleEmailServiceClient sesClient;
 
@@ -57,6 +56,20 @@ public class SesHelper {
     @Autowired
     public final void setSesClient(AmazonSimpleEmailServiceClient sesClient) {
         this.sesClient = sesClient;
+    }
+
+    /**
+     * Sends a notice to the given account that no data could be found. This notice also gives basic instructions on
+     * how they could enable data.
+     *
+     * @param studyInfo
+     *         study info, used to construct the email message, must be non-null
+     * @param accountInfo
+     *         account to send the notice to, must be non-null
+     */
+    public void sendNoDataMessageToAccount(StudyInfo studyInfo, AccountInfo accountInfo) {
+        Body body = new Body().withHtml(new Content(NO_DATA_BODY_HTML)).withText(new Content(NO_DATA_BODY_TEXT));
+        sendEmailToAccount(studyInfo, accountInfo, body);
     }
 
     /**
@@ -81,13 +94,16 @@ public class SesHelper {
         sendEmailToAccount(studyInfo, accountInfo, body);
     }
 
-    // TODO doc
-    public void sendNoDataMessageToAccount(StudyInfo studyInfo, AccountInfo accountInfo) {
-        Body body = new Body().withHtml(new Content(NO_DATA_BODY_HTML)).withText(new Content(NO_DATA_BODY_TEXT));
-        sendEmailToAccount(studyInfo, accountInfo, body);
-    }
-
-    // TODO doc
+    /**
+     * Helper method, which sends the given email message body to the given account
+     *
+     * @param studyInfo
+     *         study info, used to construct the email message, must be non-null
+     * @param accountInfo
+     *         account to send the email to, must be non-null
+     * @param body
+     *         email message body
+     */
     private void sendEmailToAccount(StudyInfo studyInfo, AccountInfo accountInfo, Body body) {
         // from address
         String studySupportEmail = studyInfo.getSupportEmail();
