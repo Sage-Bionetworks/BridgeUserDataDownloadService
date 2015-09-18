@@ -78,7 +78,7 @@ public class BridgeUddWorker implements Runnable {
 
     /** Synapse packager. Used to query Synapse and package the results in an S3 pre-signed URL. */
     @Autowired
-    public void setSynapsePackager(SynapsePackager synapsePackager) {
+    public final void setSynapsePackager(SynapsePackager synapsePackager) {
         this.synapsePackager = synapsePackager;
     }
 

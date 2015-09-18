@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
 import org.joda.time.LocalDate;
 import org.mockito.ArgumentCaptor;
+import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileDownloadSummary;
 import org.sagebionetworks.util.csv.CsvNullReader;
@@ -57,7 +58,7 @@ public class SynapseDownloadFromTableTaskTest {
     public void csvHasNoUserRows() throws Exception {
         // setup
         String csvContent = "\"recordId\",\"healthCode\",\"foo\",\"bar\",\"baz\"";
-        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null);
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null, null);
 
         // execute and validate
         SynapseDownloadFromTableResult result = task.call();
@@ -71,7 +72,7 @@ public class SynapseDownloadFromTableTaskTest {
         // setup
         String csvContent = "\"recordId\",\"foo\",\"bar\",\"baz\"\n" +
                 "\"record-1\",\"37\",\"file-handle-1\",\"file-handle-2\"";
-        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null);
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null, null);
 
         // execute
         Exception thrownEx = null;
@@ -93,7 +94,7 @@ public class SynapseDownloadFromTableTaskTest {
         UploadSchema schema = new UploadSchema.Builder().withKey(TEST_SCHEMA_KEY).addField("asdf", "INT").build();
         String csvContent = "\"recordId\",\"healthCode\",\"asdf\"\n" +
                 "\"record-1\",\"test-health-code\",\"7\"";
-        setupTestWithArgs(schema, csvContent, null);
+        setupTestWithArgs(schema, csvContent, null, null);
 
         // execute and validate
         SynapseDownloadFromTableResult result = task.call();
@@ -121,7 +122,7 @@ public class SynapseDownloadFromTableTaskTest {
         // setup
         String csvContent = "\"recordId\",\"healthCode\",\"foo\",\"bar\",\"baz\"\n" +
                 "\"record-1\",\"test-health-code\",\"13\",,";
-        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null);
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null, null);
 
         // execute and validate
         SynapseDownloadFromTableResult result = task.call();
@@ -210,7 +211,7 @@ public class SynapseDownloadFromTableTaskTest {
             fileSummaryList.add(fileSummary);
         }
 
-        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, fileSummaryList);
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null, fileSummaryList);
 
         // execute
         SynapseDownloadFromTableResult result = task.call();
@@ -289,7 +290,27 @@ public class SynapseDownloadFromTableTaskTest {
     }
 
     @Test
-    public void errorCase() throws Exception {
+    public void firstErrorCase() throws Exception {
+        // Test getting an error on the first step (download CSV). This allows us to test that cleanup works even when
+        // almost everything is null.
+
+        // setup
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, null, new TestSynapseException(), null);
+
+        // execute
+        Exception thrownEx = null;
+        try {
+            task.call();
+            fail("expected exception");
+        } catch (AsyncTaskExecutionException ex) {
+            thrownEx = ex;
+        }
+        assertNotNull(thrownEx);
+        postValidation(null);
+    }
+
+    @Test
+    public void lastErrorCase() throws Exception {
         // Test getting an error on the last step (editing CSV). This allows us to test full cleanup, including the
         // bulk download file. Since the editCsv() step has no mock dependencies, we'll use a spy to get it to throw an
         // exception.
@@ -302,7 +323,7 @@ public class SynapseDownloadFromTableTaskTest {
         fileSummary.setFileHandleId("test-file-handle");
         fileSummary.setZipEntryName("test-zip-entry");
 
-        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, ImmutableList.of(fileSummary));
+        setupTestWithArgs(DEFAULT_TEST_SCHEMA, csvContent, null, ImmutableList.of(fileSummary));
 
         task = spy(task);
         doThrow(new AsyncTaskExecutionException()).when(task).editCsv();
@@ -325,7 +346,7 @@ public class SynapseDownloadFromTableTaskTest {
         postValidation(null);
     }
 
-    private void setupTestWithArgs(UploadSchema schema, String csvContent,
+    private void setupTestWithArgs(UploadSchema schema, String csvContent, SynapseException csvException,
             List<FileDownloadSummary> fileSummaryList) throws Exception {
         // mock file helper and temp dir
         mockFileHelper = new MockFileHelper();
@@ -345,6 +366,10 @@ public class SynapseDownloadFromTableTaskTest {
         when(mockSynapseHelper.generateFileHandleFromTableQuery(synapseQueryCaptor.capture(), eq("test-table-id")))
                 .thenReturn("query-csv-file-handle-id");
         doAnswer(invocation -> {
+            if (csvException != null) {
+                throw csvException;
+            }
+
             File targetFile = invocation.getArgumentAt(1, File.class);
             try (Writer targetFileWriter = mockFileHelper.getWriter(targetFile)) {
                 targetFileWriter.write(csvContent);

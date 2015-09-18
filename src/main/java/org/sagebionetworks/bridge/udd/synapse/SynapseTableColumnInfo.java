@@ -29,6 +29,7 @@ public class SynapseTableColumnInfo {
         return healthCodeColumnIndex;
     }
 
+    /** Builder for SynapseTableColumnInfo. */
     public static class Builder {
         private final Set<Integer> fileHandleColumnIndexSet = new HashSet<>();
         private Integer healthCodeColumnIndex;
@@ -49,12 +50,17 @@ public class SynapseTableColumnInfo {
 
         /** Builds a SynapseTableColumnInfo and validates fields. */
         public SynapseTableColumnInfo build() {
-            if (healthCodeColumnIndex == null) {
-                throw new IllegalStateException("healthCodeColumnIndex must be specified");
+            if (healthCodeColumnIndex == null || healthCodeColumnIndex < 0) {
+                throw new IllegalStateException("healthCodeColumnIndex must be specified and non-negative");
             }
 
-            // No need to validate fileHandleColumnIndexSet, since it's guaranteed to be non-null, can only contain
-            // non-null entries, and is allowed to be empty.
+            // fileHandleColumnIndexSet is guaranteed to be non-null and can only contain non-null entries, but we need
+            // to check that all indices are non-negative.
+            for (int oneIdx : fileHandleColumnIndexSet) {
+                if (oneIdx < 0) {
+                    throw new IllegalStateException("fileHandleColumnIndexSet members must be non-negative");
+                }
+            }
 
             return new SynapseTableColumnInfo(fileHandleColumnIndexSet, healthCodeColumnIndex);
         }

@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -64,9 +65,19 @@ public class ZipHelperTest {
         // Validate result written to our mockZipFileOutputStream. Unzip these bytes and verify we can get back our
         // original contents.
         byte[] mockZipFileBytes = mockZipFileOutputStream.toByteArray();
+        Map<String, String> unzippedMap = unzipHelper(mockZipFileBytes);
+
+        assertEquals(unzippedMap.size(), 3);
+        assertEquals(unzippedMap.get("foo-file"), "foo content");
+        assertEquals(unzippedMap.get("bar-file"), "bar content");
+        assertEquals(unzippedMap.get("baz-file"), "baz content");
+    }
+
+    // Test helper for unzip.
+    public static Map<String, String> unzipHelper(byte[] zipBytes) throws IOException {
         Map<String, String> unzippedMap = new HashMap<>();
-        try (ByteArrayInputStream mockZipFileInputStream = new ByteArrayInputStream(mockZipFileBytes);
-                ZipInputStream zipInputStream = new ZipInputStream(mockZipFileInputStream, Charsets.UTF_8)) {
+        try (ByteArrayInputStream zipBytesInputStream = new ByteArrayInputStream(zipBytes);
+                ZipInputStream zipInputStream = new ZipInputStream(zipBytesInputStream, Charsets.UTF_8)) {
             ZipEntry zipEntry;
             while ((zipEntry = zipInputStream.getNextEntry()) != null) {
                 String filename = zipEntry.getName();
@@ -74,11 +85,7 @@ public class ZipHelperTest {
                 String fileContent = new String(fileBytes, Charsets.UTF_8);
                 unzippedMap.put(filename, fileContent);
             }
+            return unzippedMap;
         }
-
-        assertEquals(unzippedMap.size(), 3);
-        assertEquals(unzippedMap.get("foo-file"), "foo content");
-        assertEquals(unzippedMap.get("bar-file"), "bar content");
-        assertEquals(unzippedMap.get("baz-file"), "baz content");
     }
 }

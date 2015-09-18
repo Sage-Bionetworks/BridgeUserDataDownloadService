@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.OutputStream;
 
 import org.joda.time.LocalDate;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -41,25 +40,29 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
     }
 
     @Test
-    public void noFiles() {
+    public void noFiles() throws Exception {
         // Default context has all null files.
+        executeTest();
     }
 
     @Test
     public void csvOnly() throws Exception {
         task.getContext().setCsvFile(createEmptyFile("csv.csv"));
+        executeTest();
     }
 
     @Test
     public void csvAndBulkDownload() throws Exception {
         task.getContext().setCsvFile(createEmptyFile("csv.csv"));
         task.getContext().setBulkDownloadFile(createEmptyFile("download.zip"));
+        executeTest();
     }
 
     @Test
     public void csvAndEditedCsv() throws Exception {
         task.getContext().setCsvFile(createEmptyFile("csv.csv"));
         task.getContext().setEditedCsvFile(createEmptyFile("csv-edited.csv"));
+        executeTest();
     }
 
     @Test
@@ -67,6 +70,7 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
         task.getContext().setCsvFile(createEmptyFile("csv.csv"));
         task.getContext().setBulkDownloadFile(createEmptyFile("download.zip"));
         task.getContext().setEditedCsvFile(createEmptyFile("csv-edited.csv"));
+        executeTest();
     }
 
     // branch coverage
@@ -76,10 +80,11 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
         task.getContext().setCsvFile(mockFileHelper.newFile(tmpDir, "csv.csv"));
         task.getContext().setBulkDownloadFile(mockFileHelper.newFile(tmpDir, "download.zip"));
         task.getContext().setEditedCsvFile(mockFileHelper.newFile(tmpDir, "csv-edited.csv"));
+        executeTest();
     }
 
-    @AfterMethod
-    public void postValidation() throws Exception {
+    // We don't want to use AfterMethod for this, because if it fails, TestNG won't tell us which test failed.
+    public void executeTest() throws Exception {
         // Run the actual cleanup.
         task.cleanupFiles();
 

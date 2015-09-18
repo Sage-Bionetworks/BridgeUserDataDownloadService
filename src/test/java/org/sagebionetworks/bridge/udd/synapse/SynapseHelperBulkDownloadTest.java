@@ -22,7 +22,6 @@ import org.sagebionetworks.repo.model.file.BulkFileDownloadRequest;
 import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileHandleAssociateType;
 import org.sagebionetworks.repo.model.file.FileHandleAssociation;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -69,6 +68,7 @@ public class SynapseHelperBulkDownloadTest {
         assertSame(retval, dummyResponse);
 
         verify(mockClient, times(1)).getBulkFileDownloadResults(anyString());
+        postValidation();
     }
 
     @Test
@@ -84,6 +84,7 @@ public class SynapseHelperBulkDownloadTest {
         assertSame(retval, dummyResponse);
 
         verify(mockClient, times(2)).getBulkFileDownloadResults(anyString());
+        postValidation();
     }
 
     @Test
@@ -103,6 +104,7 @@ public class SynapseHelperBulkDownloadTest {
         assertNotNull(thrownEx);
 
         verify(mockClient, times(2)).getBulkFileDownloadResults(anyString());
+        postValidation();
     }
 
     @Test
@@ -121,9 +123,10 @@ public class SynapseHelperBulkDownloadTest {
         assertNotNull(thrownEx);
 
         verify(mockClient, times(1)).getBulkFileDownloadResults(anyString());
+        postValidation();
     }
 
-    @AfterMethod
+    // We don't want to use AfterMethod for this, because if it fails, TestNG won't tell us which test failed.
     public void postValidation() {
         // validate the bulk download request makes sense given our file handle ID set
         BulkFileDownloadRequest request = requestCaptor.getValue();

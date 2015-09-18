@@ -44,6 +44,7 @@ public class SynapsePackager {
     // package-scoped to be available in tests
     static final String CONFIG_KEY_EXPIRATION_HOURS = "s3.url.expiration.hours";
     static final String CONFIG_KEY_USERDATA_BUCKET = "userdata.bucket";
+    static final String ERROR_LOG_FILE_NAME = "error.log";
 
     private static final Joiner LINE_JOINER = Joiner.on('\n');
 
@@ -110,21 +111,21 @@ public class SynapsePackager {
      */
     public PresignedUrlInfo packageSynapseData(Map<String, UploadSchema> synapseToSchemaMap, String healthCode,
             BridgeUddRequest request) throws IOException {
-        File tmpDir = fileHelper.createTempDir();
-
-        // create and execute Synapse downloads asynchronously
-        List<Future<SynapseDownloadFromTableResult>> taskFutureList = initAsyncTasks(synapseToSchemaMap, healthCode,
-                request, tmpDir);
-        List<File> allFileList = waitForAsyncTasks(tmpDir, taskFutureList);
-
-        if (allFileList.isEmpty()) {
-            // There are no files to send, meaning there is no user data to send. Return null, to signal that there is
-            // no pre-signed URL to send.
-            return null;
-        }
-
+        List<File> allFileList = null;
         File masterZipFile = null;
+        File tmpDir = fileHelper.createTempDir();
         try {
+            // create and execute Synapse downloads asynchronously
+            List<Future<SynapseDownloadFromTableResult>> taskFutureList = initAsyncTasks(synapseToSchemaMap,
+                    healthCode, request, tmpDir);
+            allFileList = waitForAsyncTasks(tmpDir, taskFutureList);
+
+            if (allFileList.isEmpty()) {
+                // There are no files to send, meaning there is no user data to send. Return null, to signal that there
+                // is no pre-signed URL to send.
+                return null;
+            }
+
             // Zip up all upload files. Filename is "userdata-[startDate]-to-[endDate]-[random guid].zip". This allows
             // the filename to be unique, user-friendly, and contain no identifying info.
             String masterZipFileName = "userdata-" + request.getStartDate() + "-to-" + request.getEndDate() + "-" +
@@ -140,8 +141,13 @@ public class SynapsePackager {
     }
 
     /**
+     * <p>
      * Kicks off the async SynapseDownloadFromTableTasks. These tasks query the Synapse table and download both the
      * CSV and the bulk download for attached file handles.
+     * </p>
+     * <p>
+     * This is made package-scoped so unit tests can hook into it.
+     * </p>
      *
      * @param synapseToSchemaMap
      *         map of all Synapse table IDs in the current study and their corresponding schemas
@@ -153,7 +159,7 @@ public class SynapsePackager {
      *         temp directory that files should be downloaded to
      * @return list of Futures for the async tasks
      */
-    private List<Future<SynapseDownloadFromTableResult>> initAsyncTasks(Map<String, UploadSchema> synapseToSchemaMap,
+    List<Future<SynapseDownloadFromTableResult>> initAsyncTasks(Map<String, UploadSchema> synapseToSchemaMap,
             String healthCode, BridgeUddRequest request, File tmpDir) {
         List<Future<SynapseDownloadFromTableResult>> taskFutureList = new ArrayList<>();
         for (Map.Entry<String, UploadSchema> oneSynapseToSchemaEntry : synapseToSchemaMap.entrySet()) {
@@ -166,10 +172,11 @@ public class SynapsePackager {
                     .withSchema(schema).build();
 
             // kick off async task
-            SynapseDownloadFromTableTask downloadCsvTask = newDownloadCsvTask(param);
-            Future<SynapseDownloadFromTableResult> downloadCsvTaskFuture = auxiliaryExecutorService.submit(
-                    downloadCsvTask);
-            taskFutureList.add(downloadCsvTaskFuture);
+            SynapseDownloadFromTableTask task = new SynapseDownloadFromTableTask(param);
+            task.setFileHelper(fileHelper);
+            task.setSynapseHelper(synapseHelper);
+            Future<SynapseDownloadFromTableResult> taskFuture = auxiliaryExecutorService.submit(task);
+            taskFutureList.add(taskFuture);
         }
 
         return taskFutureList;
@@ -213,7 +220,7 @@ public class SynapsePackager {
         // write errors into an error log file for the user
         if (!errorList.isEmpty()) {
             String errorLog = LINE_JOINER.join(errorList);
-            File errorLogFile = fileHelper.newFile(tmpDir, "error.log");
+            File errorLogFile = fileHelper.newFile(tmpDir, ERROR_LOG_FILE_NAME);
 
             try (Writer errorLogFileWriter = fileHelper.getWriter(errorLogFile)) {
                 errorLogFileWriter.write(errorLog);
@@ -279,7 +286,12 @@ public class SynapsePackager {
     }
 
     /**
+     * <p>
      * Cleans up all the files we wrote for the given run. If the files are null or don't exist, skip them.
+     * </p>
+     * <p>
+     * This is package-scoped to allow direct access from unit tests.
+     * </p>
      *
      * @param allFileList
      *         list of files returned by the async tasks
@@ -288,11 +300,14 @@ public class SynapsePackager {
      * @param tmpDir
      *         temp dir containing all these files, obviously deleted last
      */
-    private void cleanupFiles(List<File> allFileList, File masterZipFile, File tmpDir) {
+    void cleanupFiles(List<File> allFileList, File masterZipFile, File tmpDir) {
         // cleanup files
         List<File> filesToDelete = new ArrayList<>();
-        filesToDelete.addAll(allFileList);
+        if (allFileList != null) {
+            filesToDelete.addAll(allFileList);
+        }
         filesToDelete.add(masterZipFile);
+
         for (File oneFileToDelete : filesToDelete) {
             if (oneFileToDelete == null || !fileHelper.fileExists(oneFileToDelete)) {
                 // No file. No need to cleanup.
@@ -312,24 +327,6 @@ public class SynapsePackager {
         } catch (IOException ex) {
             LOG.error("Error deleting temp dir " + tmpDir.getAbsolutePath());
         }
-    }
-
-    /**
-     * <p>
-     * Creates a SynapseDownloadCsvFromTableTask. This is a member method, so we can mock out task execution in unit
-     * tests. This is package-scoped to make it available to unit tests.
-     * </p>
-     * <p>
-     * We use a factory method here instead of using Spring, because Spring can't be mocked and we need to create
-     * multiple copies of the synapse task.
-     * </p>
-     */
-    // TODO: We prolly don't have to mock this, since we mock the executor service.
-    SynapseDownloadFromTableTask newDownloadCsvTask(SynapseDownloadFromTableParameters param) {
-        SynapseDownloadFromTableTask task = new SynapseDownloadFromTableTask(param);
-        task.setFileHelper(fileHelper);
-        task.setSynapseHelper(synapseHelper);
-        return task;
     }
 
     /**
