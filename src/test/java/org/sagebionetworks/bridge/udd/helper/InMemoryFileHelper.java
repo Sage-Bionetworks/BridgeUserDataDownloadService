@@ -16,8 +16,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-// mock file helper - store files in an in-memory map
-public class MockFileHelper extends FileHelper {
+/** This file helper stores all files and temp dirs in an in-memory map. For use with unit tests. */
+public class InMemoryFileHelper extends FileHelper {
     private final Set<String> dirSet = new HashSet<>();
     private final Map<String, byte[]> fileMap = new HashMap<>();
 

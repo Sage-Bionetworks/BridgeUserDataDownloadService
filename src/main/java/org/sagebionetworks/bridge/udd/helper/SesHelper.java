@@ -7,7 +7,6 @@ import com.amazonaws.services.simpleemail.model.Destination;
 import com.amazonaws.services.simpleemail.model.Message;
 import com.amazonaws.services.simpleemail.model.SendEmailRequest;
 import com.amazonaws.services.simpleemail.model.SendEmailResult;
-import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +22,11 @@ public class SesHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SesHelper.class);
 
     // TODO: move these to config
-    private static final String DEFAULT_FROM_ADDRESS = "Bridge (Sage Bionetworks) <support@sagebridge.org>";
     private static final String SUBJECT_TEMPLATE = "Your requested data from %s";
 
     private static final String BODY_TEMPLATE_HTML = "<html>%n" +
             "   <body>%n" +
-            "       <p>To download your requested data, please click <a href=\"%s\">here</a>.</p>%n" +
+            "       <p>Your <a href=\"%s\">requested data download</a> is now available.</p>%n" +
             "       <p>This link will expire on %s.</p>%n" +
             "   </body>%n" +
             "</html>";
@@ -37,18 +35,16 @@ public class SesHelper {
             "%n" +
             "This link will expire on %s.";
 
-    private static final String NO_DATA_BODY_HTML = "<html>\n" +
-            "   <body>\n" +
-            "       <p>\n" +
-            "           There was no data available for your request. Data will only be available if your sharing\n" +
-            "           settings are set to share data. Please check your sharing settings and please wait at\n" +
-            "           least 24 hours for data to finish processing.\n" +
-            "       </p>\n" +
-            "   </body>\n" +
-            "</html>";
     private static final String NO_DATA_BODY_TEXT = "There was no data available for your request. Data will only be available if your sharing\n" +
             "settings are set to share data. Please check your sharing settings and please wait at\n" +
             "least 24 hours for data to finish processing.";
+    private static final String NO_DATA_BODY_HTML = "<html>\n" +
+            "   <body>\n" +
+            "       <p>\n" +
+            NO_DATA_BODY_TEXT +
+            "       </p>\n" +
+            "   </body>\n" +
+            "</html>";
 
     private AmazonSimpleEmailServiceClient sesClient;
 
@@ -106,8 +102,7 @@ public class SesHelper {
      */
     private void sendEmailToAccount(StudyInfo studyInfo, AccountInfo accountInfo, Body body) {
         // from address
-        String studySupportEmail = studyInfo.getSupportEmail();
-        String fromAddress = !Strings.isNullOrEmpty(studySupportEmail) ? studySupportEmail : DEFAULT_FROM_ADDRESS;
+        String fromAddress = studyInfo.getSupportEmail();
 
         // to address
         Destination destination = new Destination().withToAddresses(accountInfo.getEmailAddress());

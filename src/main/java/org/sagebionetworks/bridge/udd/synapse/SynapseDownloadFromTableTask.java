@@ -78,7 +78,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * @return list of files downloaded
      */
     @Override
-    public SynapseDownloadFromTableResult call() {
+    public SynapseDownloadFromTableResult call() throws AsyncTaskExecutionException {
         try {
             downloadCsv();
             if (filterNoDataCsvFiles()) {
@@ -106,10 +106,10 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
 
             return new SynapseDownloadFromTableResult.Builder().withCsvFile(ctx.getCsvFile())
                     .withBulkDownloadFile(ctx.getBulkDownloadFile()).build();
-        } catch (RuntimeException ex) {
+        } catch (AsyncTaskExecutionException | RuntimeException ex) {
             // Cleanup files. No need to leave garbage behind.
             cleanupFiles();
-            throw new AsyncTaskExecutionException(ex);
+            throw ex;
         }
     }
 
@@ -118,7 +118,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * (except schema) from {@link SynapseDownloadFromTableParameters} to generate the query and writes the resulting
      * CSV to {@link SynapseDownloadFromTableContext#setCsvFile}.
      */
-    private void downloadCsv() {
+    private void downloadCsv() throws AsyncTaskExecutionException {
         String synapseTableId = params.getSynapseTableId();
         File csvFile = fileHelper.newFile(params.getTempDir(), params.getSchema().getKey().toString() + ".csv");
         String csvFilePath = csvFile.getAbsolutePath();
@@ -154,7 +154,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      *
      * @return true if the file should be filtered because there's no user data
      */
-    private boolean filterNoDataCsvFiles() {
+    private boolean filterNoDataCsvFiles() throws AsyncTaskExecutionException {
         int numLines = 0;
         try (BufferedReader csvFileReader = fileHelper.getReader(ctx.getCsvFile())) {
             while (csvFileReader.readLine() != null) {
@@ -162,7 +162,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
                 if (numLines >= 2) {
                     // We only need to read 2 lines (1 header, 1 user data). Now that we've read 2 lines, we can
                     // short-circuit
-                    break;
+                    return false;
                 }
             }
         } catch (IOException ex) {
@@ -170,18 +170,13 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
                     ex.getMessage(), ex);
         }
 
-        // If there aren't at least 2 lines (1 line headers, 1+ lines of data), then filter out the file, since we
-        // don't need it. Don't log or throw, since this could be a normal case.
-        if (numLines < 2) {
-            LOG.info("No user data found for file " + ctx.getCsvFilePath() + ". Short-circuiting.");
+        // If we make it this far, it's because we didn't read 2 lines. So there's no user data.
+        LOG.info("No user data found for file " + ctx.getCsvFilePath() + ". Short-circuiting.");
 
-            // cleanup files, since there's no data to keep around anyway
-            cleanupFiles();
+        // cleanup files, since there's no data to keep around anyway
+        cleanupFiles();
 
-            return true;
-        } else {
-            return false;
-        }
+        return true;
     }
 
     /**
@@ -190,7 +185,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * {@link SynapseDownloadFromTableContext#getCsvFile} and writes the results to
      * {@link SynapseDownloadFromTableContext#setColumnInfo}.
      */
-    private void getColumnInfoFromCsv() {
+    private void getColumnInfoFromCsv() throws AsyncTaskExecutionException {
         try (CsvNullReader csvFileReader = new CsvNullReader(fileHelper.getReader(ctx.getCsvFile()))) {
             // Get first row, the header row. Because of our previous check, we know this row must exist.
             String[] headerRow = csvFileReader.readNext();
@@ -222,7 +217,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * {@link SynapseDownloadFromTableContext#getCsvFile} and {@link SynapseDownloadFromTableContext#getColumnInfo} and
      * writes the results to {@link SynapseDownloadFromTableContext#addFileHandleIds}.
      */
-    private void extractFileHandleIdsFromCsv() {
+    private void extractFileHandleIdsFromCsv() throws AsyncTaskExecutionException {
         Set<Integer> fileHandleColIdxSet = ctx.getColumnInfo().getFileHandleColumnIndexSet();
 
         Stopwatch extractFileHandlesStopwatch = Stopwatch.createStarted();
@@ -259,7 +254,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * {@link SynapseDownloadFromTableContext#setFileSummaryList} and
      * {@link SynapseDownloadFromTableContext#setBulkDownloadFile}.
      */
-    private void bulkDownloadFileHandles() {
+    private void bulkDownloadFileHandles() throws AsyncTaskExecutionException {
         // download file handles
         File bulkDownloadFile = fileHelper.newFile(params.getTempDir(), params.getSchema().getKey().toString() +
                 ".zip");
@@ -299,7 +294,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * This method is package-scoped, to allow unit tests to inject an exception here.
      * </p>
      */
-    void editCsv() {
+    void editCsv() throws AsyncTaskExecutionException {
         // Convert file summary in bulk download response into a map from file handle ID to zip entry name.
         Map<String, String> fileHandleIdToReplacement = new HashMap<>();
         List<FileDownloadSummary> fileSummaryList = ctx.getFileSummaryList();

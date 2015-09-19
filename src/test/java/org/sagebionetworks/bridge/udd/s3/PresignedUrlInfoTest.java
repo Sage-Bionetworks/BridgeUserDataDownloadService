@@ -8,12 +8,12 @@ import org.joda.time.DateTime;
 import org.testng.annotations.Test;
 
 public class PresignedUrlInfoTest {
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*url.*")
     public void nullUrl() {
         new PresignedUrlInfo.Builder().withExpirationTime(DateTime.parse("2015-08-19T14:00:00-07:00")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*expirationTime.*")
     public void nullExpirationDate() throws Exception {
         new PresignedUrlInfo.Builder().withUrl(new URL("http://www.example.com/")).build();
     }

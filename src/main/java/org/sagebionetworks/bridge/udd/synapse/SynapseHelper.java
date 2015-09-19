@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.sagebionetworks.client.SynapseClient;
 import org.sagebionetworks.client.exceptions.SynapseException;
@@ -97,28 +98,7 @@ public class SynapseHelper {
         String asyncJobToken = synapseClient.startBulkFileDownload(request);
 
         // Poll Synapse until results are ready.
-        BulkFileDownloadResponse response = null;
-        for (int tries = 0; tries < pollMaxTries; tries++) {
-            if (pollIntervalMillis > 0) {
-                try {
-                    Thread.sleep(pollIntervalMillis);
-                } catch (InterruptedException ex) {
-                    LOG.warn("Interrupted while sleeping: " + ex.getMessage(), ex);
-                }
-            }
-
-            try {
-                response = synapseClient.getBulkFileDownloadResults(asyncJobToken);
-                break;
-            } catch (SynapseResultNotReadyException ex) {
-                // Result not ready. Spin around one more time.
-            }
-        }
-
-        if (response == null) {
-            throw new AsyncTimeoutException("Bulk file download returned null result for table " + synapseTableId);
-        }
-        return response;
+        return pollAsync(() -> synapseClient.getBulkFileDownloadResults(asyncJobToken));
     }
 
     /**
@@ -141,7 +121,26 @@ public class SynapseHelper {
                     /*includeRowIdAndRowVersion*/false, /*csvDescriptor*/null, synapseTableId);
 
         // Poll Synapse until results are ready.
-        DownloadFromTableResult result = null;
+        DownloadFromTableResult result = pollAsync(() ->
+                synapseClient.downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId));
+        return result.getResultsFileHandleId();
+    }
+
+    /**
+     * Polls the Synapse async call in a loop, according to the poll interval and max tries config.
+     *
+     * @param callable
+     *         Synapse async call
+     * @param <T>
+     *         Synapse async call return type
+     * @return async result
+     * @throws AsyncTimeoutException
+     *         if the async call to Synapse times out, according to the config settings
+     * @throws SynapseException
+     *         if the Synapse call fails
+     */
+    private <T> T pollAsync(SynapseCallable<T> callable) throws AsyncTimeoutException, SynapseException {
+        T result = null;
         for (int tries = 0; tries < pollMaxTries; tries++) {
             if (pollIntervalMillis > 0) {
                 try {
@@ -152,16 +151,26 @@ public class SynapseHelper {
             }
 
             try {
-                result = synapseClient.downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId);
+                result = callable.call();
                 break;
             } catch (SynapseResultNotReadyException ex) {
                 // Result not ready. Spin around one more time.
             }
         }
-
         if (result == null) {
-            throw new AsyncTimeoutException("Download CSV returned null results for table " + synapseTableId);
+            throw new AsyncTimeoutException("Synapse async call timed out");
         }
-        return result.getResultsFileHandleId();
+        return result;
+    }
+
+    /**
+     * Sub-interface of Callable which represents a Synapse async call. This is used to limit the exception being
+     * thrown, so we don't have to catch Exception everywhere. This is used only for pollAsync().
+     *
+     * @param <T>
+     *         return type of the Synapse async call
+     */
+    private interface SynapseCallable<T> extends Callable<T> {
+        T call() throws SynapseException;
     }
 }

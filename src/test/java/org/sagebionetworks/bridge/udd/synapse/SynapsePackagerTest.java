@@ -5,7 +5,6 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
 import static org.mockito.Matchers.startsWith;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -30,13 +29,14 @@ import com.amazonaws.AmazonClientException;
 import com.amazonaws.HttpMethod;
 import com.google.common.collect.ImmutableMap;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeUtils;
 import org.joda.time.LocalDate;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.helper.MockFileHelper;
+import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
 import org.sagebionetworks.bridge.udd.helper.ZipHelper;
 import org.sagebionetworks.bridge.udd.helper.ZipHelperTest;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
@@ -60,7 +60,7 @@ public class SynapsePackagerTest {
             .withEndDate(LocalDate.parse(TEST_END_DATE)).build();
 
     private S3Helper mockS3Helper;
-    private MockFileHelper mockFileHelper;
+    private InMemoryFileHelper inMemoryFileHelper;
     private SynapsePackager packager;
     private byte[] s3FileBytes;
 
@@ -83,7 +83,7 @@ public class SynapsePackagerTest {
         assertNull(s3FileBytes);
 
         // validate mock file helper is clean
-        assertTrue(mockFileHelper.isEmpty());
+        assertTrue(inMemoryFileHelper.isEmpty());
     }
 
     @Test
@@ -148,7 +148,7 @@ public class SynapsePackagerTest {
         assertEquals(expirationTime.getMillis(), expectedExpirationTimeMillis);
 
         // validate mock file helper is clean
-        assertTrue(mockFileHelper.isEmpty());
+        assertTrue(inMemoryFileHelper.isEmpty());
     }
 
     @Test
@@ -165,8 +165,8 @@ public class SynapsePackagerTest {
         doThrow(RuntimeException.class).when(packager).initAsyncTasks(same(synapseTableToSchema), eq(TEST_HEALTH_CODE),
                 same(TEST_UDD_REQUEST), any(File.class));
 
-        mockFileHelper = new MockFileHelper();
-        packager.setFileHelper(mockFileHelper);
+        inMemoryFileHelper = new InMemoryFileHelper();
+        packager.setFileHelper(inMemoryFileHelper);
 
         // execute
         Exception thrownEx = null;
@@ -179,7 +179,7 @@ public class SynapsePackagerTest {
         assertNotNull(thrownEx);
 
         // validate mock file helper is clean
-        assertTrue(mockFileHelper.isEmpty());
+        assertTrue(inMemoryFileHelper.isEmpty());
     }
 
     @Test
@@ -220,22 +220,24 @@ public class SynapsePackagerTest {
         assertEquals(expirationTime.getMillis(), MOCK_NOW.plusHours(URL_EXPIRATION_HOURS).getMillis());
 
         // validate mock file helper is clean
-        assertTrue(mockFileHelper.isEmpty());
+        assertTrue(inMemoryFileHelper.isEmpty());
     }
 
     private void setupPackager(Map<String, UploadSchema> synapseTableToSchema,
             Map<String, SynapseTaskResultContent> synapseTableToResult,
             Map<String, ExecutionException> synapseTableToException) {
         // spy "now" and replace it with MOCK_NOW
-        packager = spy(new SynapsePackager());
-        doReturn(MOCK_NOW).when(packager).now();
+        packager = new SynapsePackager();
+
+        // Set the current time to MOCK_NOW, so we can test pre-signed URL expiration date appropriately.
+        DateTimeUtils.setCurrentMillisFixed(MOCK_NOW.getMillis());
 
         // branch coverage: noop synapse helper
         packager.setSynapseHelper(mock(SynapseHelper.class));
 
         // mock file helper
-        mockFileHelper = new MockFileHelper();
-        packager.setFileHelper(mockFileHelper);
+        inMemoryFileHelper = new InMemoryFileHelper();
+        packager.setFileHelper(inMemoryFileHelper);
 
         // mock executor service to just call the callables directly
         ExecutorService mockExecutorService = mock(ExecutorService.class);
@@ -284,7 +286,7 @@ public class SynapsePackagerTest {
 
         // Use real zip helper. It's easier to use the real one than to mock it out.
         ZipHelper zipHelper = new ZipHelper();
-        zipHelper.setFileHelper(mockFileHelper);
+        zipHelper.setFileHelper(inMemoryFileHelper);
         packager.setZipHelper(zipHelper);
 
         // mock config
@@ -302,7 +304,7 @@ public class SynapsePackagerTest {
         doAnswer(invocation -> {
             // on cleanup, the file is destroyed, so we need to intercept that file now
             File s3File = invocation.getArgumentAt(2, File.class);
-            s3FileBytes = mockFileHelper.getBytes(s3File);
+            s3FileBytes = inMemoryFileHelper.getBytes(s3File);
 
             // needed because Answer declares a return type, even if it's Void
             return null;
@@ -312,8 +314,8 @@ public class SynapsePackagerTest {
     }
 
     private File createFileWithContent(File tmpDir, String filename, String content) throws Exception {
-        File file = mockFileHelper.newFile(tmpDir, filename);
-        try (Writer fileWriter = mockFileHelper.getWriter(file)) {
+        File file = inMemoryFileHelper.newFile(tmpDir, filename);
+        try (Writer fileWriter = inMemoryFileHelper.getWriter(file)) {
             fileWriter.write(content);
         }
         return file;

@@ -49,7 +49,7 @@ public class PresignedUrlInfo {
             }
 
             if (expirationTime == null) {
-                throw new IllegalStateException("expiration time must be specified");
+                throw new IllegalStateException("expirationTime must be specified");
             }
 
             return new PresignedUrlInfo(url, expirationTime);

@@ -279,7 +279,7 @@ public class SynapsePackager {
      */
     private PresignedUrlInfo generatePresignedUrlInfo(String masterZipFilename) {
         // Get pre-signed URL for download. This URL expires after a number of hours, defined by configuration.
-        DateTime expirationTime = now().plusHours(urlExpirationHours);
+        DateTime expirationTime = DateTime.now().plusHours(urlExpirationHours);
         URL presignedUrl = s3Helper.generatePresignedUrl(userdataBucketName, masterZipFilename, expirationTime,
                 HttpMethod.GET);
         return new PresignedUrlInfo.Builder().withUrl(presignedUrl).withExpirationTime(expirationTime).build();
@@ -327,13 +327,5 @@ public class SynapsePackager {
         } catch (IOException ex) {
             LOG.error("Error deleting temp dir " + tmpDir.getAbsolutePath());
         }
-    }
-
-    /**
-     * Helper method which returns "now". This is moved into a member method to enable mocking and is package-scoped to
-     * make it available to unit tests.
-     */
-    DateTime now() {
-        return DateTime.now();
     }
 }

@@ -11,7 +11,7 @@ import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
-import org.sagebionetworks.bridge.udd.helper.MockFileHelper;
+import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
 
 // Deep tests for SynapseDownloadFromTableTask.cleanupFiles()
 public class SynapseDownloadFromTableTaskCleanupFilesTest {
@@ -22,21 +22,21 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
             .addField("foo", "STRING").build();
 
     private File tmpDir;
-    private MockFileHelper mockFileHelper;
+    private InMemoryFileHelper inMemoryFileHelper;
     private SynapseDownloadFromTableTask task;
 
     @BeforeMethod
     public void setup() {
         // mock file helper and temp dir
-        mockFileHelper = new MockFileHelper();
-        tmpDir = mockFileHelper.createTempDir();
+        inMemoryFileHelper = new InMemoryFileHelper();
+        tmpDir = inMemoryFileHelper.createTempDir();
 
         SynapseDownloadFromTableParameters params = new SynapseDownloadFromTableParameters.Builder()
                 .withSynapseTableId("test-table-id").withHealthCode("test-health-code")
                 .withStartDate(LocalDate.parse("2015-03-09")).withEndDate(LocalDate.parse("2015-09-16"))
                 .withTempDir(tmpDir).withSchema(TEST_SCHEMA).build();
         task = new SynapseDownloadFromTableTask(params);
-        task.setFileHelper(mockFileHelper);
+        task.setFileHelper(inMemoryFileHelper);
     }
 
     @Test
@@ -77,9 +77,9 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
     @Test
     public void nonNullFilesButDontExist() throws Exception {
         // Create the files, but don't write any content to them, so they won't exist.
-        task.getContext().setCsvFile(mockFileHelper.newFile(tmpDir, "csv.csv"));
-        task.getContext().setBulkDownloadFile(mockFileHelper.newFile(tmpDir, "download.zip"));
-        task.getContext().setEditedCsvFile(mockFileHelper.newFile(tmpDir, "csv-edited.csv"));
+        task.getContext().setCsvFile(inMemoryFileHelper.newFile(tmpDir, "csv.csv"));
+        task.getContext().setBulkDownloadFile(inMemoryFileHelper.newFile(tmpDir, "download.zip"));
+        task.getContext().setEditedCsvFile(inMemoryFileHelper.newFile(tmpDir, "csv-edited.csv"));
         executeTest();
     }
 
@@ -89,20 +89,20 @@ public class SynapseDownloadFromTableTaskCleanupFilesTest {
         task.cleanupFiles();
 
         // The only file remaining is the temp dir. Delete that dir, then verify the mock file system is empty.
-        mockFileHelper.deleteDir(tmpDir);
-        assertTrue(mockFileHelper.isEmpty());
+        inMemoryFileHelper.deleteDir(tmpDir);
+        assertTrue(inMemoryFileHelper.isEmpty());
     }
 
     // Creates a trivial empty file, so we can test cleanup.
     private File createEmptyFile(String filename) throws Exception {
-        File file = mockFileHelper.newFile(tmpDir, filename);
+        File file = inMemoryFileHelper.newFile(tmpDir, filename);
         touchFile(file);
         return file;
     }
 
     // Write an empty string to the file to ensure that it exists in our (mock) file system.
     private void touchFile(File file) throws Exception {
-        try (OutputStream fileOutputStream = mockFileHelper.getOutputStream(file)) {
+        try (OutputStream fileOutputStream = inMemoryFileHelper.getOutputStream(file)) {
             fileOutputStream.write(EMPTY_FILE_CONTENT);
         }
     }

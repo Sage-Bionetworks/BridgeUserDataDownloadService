@@ -6,17 +6,20 @@ import static org.testng.Assert.assertTrue;
 import org.testng.annotations.Test;
 
 public class SynapseTableColumnInfoTest {
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class,
+            expectedExceptionsMessageRegExp = ".*healthCodeColumnIndex.*")
     public void nullHealthCodeIndex() {
         new SynapseTableColumnInfo.Builder().build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class,
+            expectedExceptionsMessageRegExp = ".*healthCodeColumnIndex.*")
     public void negativeHealthCodeIndex() {
         new SynapseTableColumnInfo.Builder().withHealthCodeColumnIndex(-1).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class,
+            expectedExceptionsMessageRegExp = ".*fileHandleColumnIndexSet.*")
     public void negativeFileHandleIndex() {
         new SynapseTableColumnInfo.Builder().withHealthCodeColumnIndex(3).addFileHandleColumnIndex(-4).build();
     }

@@ -35,7 +35,7 @@ public class UploadSchemaTest {
         assertEquals(fieldTypeMap.get("bar"), "INT");
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*key.*")
     public void nullKey() {
         new UploadSchema.Builder().addField("foo", "STRING").addField("bar", "INT").build();
     }

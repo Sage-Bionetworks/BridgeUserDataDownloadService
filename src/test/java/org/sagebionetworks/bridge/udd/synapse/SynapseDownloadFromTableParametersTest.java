@@ -21,42 +21,42 @@ public class SynapseDownloadFromTableParametersTest {
     private static final UploadSchema TEST_SCHEMA = new UploadSchema.Builder().withKey(TEST_SCHEMA_KEY)
             .addField("foo", "STRING").build();
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*synapseTableId.*")
     public void nullSynapseTableId() {
         new SynapseDownloadFromTableParameters.Builder().withHealthCode("test-health-code")
                 .withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE).withTempDir(DUMMY_FILE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*synapseTableId.*")
     public void emptySynapseTableId() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("").withHealthCode("test-health-code")
                 .withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE).withTempDir(DUMMY_FILE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*healthCode.*")
     public void nullHealthCode() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id")
                 .withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE).withTempDir(DUMMY_FILE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*healthCode.*")
     public void emptyHealthCode() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id").withHealthCode("")
                 .withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE).withTempDir(DUMMY_FILE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*startDate.*")
     public void nullStartDate() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id")
                 .withHealthCode("test-health-code").withEndDate(TEST_END_DATE).withTempDir(DUMMY_FILE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*endDate.*")
     public void nullEndDate() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id")
                 .withHealthCode("test-health-code").withStartDate(TEST_START_DATE).withTempDir(DUMMY_FILE)
@@ -71,14 +71,14 @@ public class SynapseDownloadFromTableParametersTest {
                 .build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*tempDir.*")
     public void nullTempDir() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id")
                 .withHealthCode("test-health-code").withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE)
                 .withSchema(TEST_SCHEMA).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*schema.*")
     public void nullSchema() {
         new SynapseDownloadFromTableParameters.Builder().withSynapseTableId("test-table-id")
                 .withHealthCode("test-health-code").withStartDate(TEST_START_DATE).withEndDate(TEST_END_DATE)

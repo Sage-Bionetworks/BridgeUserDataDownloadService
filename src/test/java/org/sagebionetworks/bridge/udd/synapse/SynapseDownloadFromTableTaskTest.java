@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTaskExecutionException;
-import org.sagebionetworks.bridge.udd.helper.MockFileHelper;
+import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class SynapseDownloadFromTableTaskTest {
@@ -48,7 +48,7 @@ public class SynapseDownloadFromTableTaskTest {
     private static final UploadSchema DEFAULT_TEST_SCHEMA = new UploadSchema.Builder().withKey(TEST_SCHEMA_KEY)
             .addField("foo", "INT").addField("bar", "ATTACHMENT_BLOB").addField("baz", "ATTACHMENT_JSON_BLOB").build();
 
-    private MockFileHelper mockFileHelper;
+    private InMemoryFileHelper inMemoryFileHelper;
     private ArgumentCaptor<String> synapseQueryCaptor;
     private ArgumentCaptor<Set> synapseFileHandleIdSetCaptor;
     private SynapseDownloadFromTableTask task;
@@ -79,10 +79,10 @@ public class SynapseDownloadFromTableTaskTest {
         try {
             task.call();
             fail("expected exception");
-        } catch (AsyncTaskExecutionException ex) {
+        } catch (IllegalStateException ex) {
             thrownEx = ex;
         }
-        assertNotNull(thrownEx);
+        assertTrue(thrownEx.getMessage().contains("healthCodeColumnIndex"));
 
         // validate
         postValidation(null);
@@ -272,7 +272,7 @@ public class SynapseDownloadFromTableTaskTest {
         assertTrue(Strings.isNullOrEmpty(parsedCsv.get(5)[4]));
 
         // validate bulk download file - It's just "dummy zip content"
-        try (Reader bulkDownloadFileReader = mockFileHelper.getReader(result.getBulkDownloadFile())) {
+        try (Reader bulkDownloadFileReader = inMemoryFileHelper.getReader(result.getBulkDownloadFile())) {
             assertEquals(CharStreams.toString(bulkDownloadFileReader), "dummy zip content");
         }
 
@@ -349,8 +349,8 @@ public class SynapseDownloadFromTableTaskTest {
     private void setupTestWithArgs(UploadSchema schema, String csvContent, SynapseException csvException,
             List<FileDownloadSummary> fileSummaryList) throws Exception {
         // mock file helper and temp dir
-        mockFileHelper = new MockFileHelper();
-        tmpDir = mockFileHelper.createTempDir();
+        inMemoryFileHelper = new InMemoryFileHelper();
+        tmpDir = inMemoryFileHelper.createTempDir();
 
         // set up params and task
         SynapseDownloadFromTableParameters params = new SynapseDownloadFromTableParameters.Builder()
@@ -358,7 +358,7 @@ public class SynapseDownloadFromTableTaskTest {
                 .withStartDate(LocalDate.parse("2015-03-09")).withEndDate(LocalDate.parse("2015-09-16"))
                 .withTempDir(tmpDir).withSchema(schema).build();
         task = new SynapseDownloadFromTableTask(params);
-        task.setFileHelper(mockFileHelper);
+        task.setFileHelper(inMemoryFileHelper);
 
         // mock Synapse CSV content
         SynapseHelper mockSynapseHelper = mock(SynapseHelper.class);
@@ -371,7 +371,7 @@ public class SynapseDownloadFromTableTaskTest {
             }
 
             File targetFile = invocation.getArgumentAt(1, File.class);
-            try (Writer targetFileWriter = mockFileHelper.getWriter(targetFile)) {
+            try (Writer targetFileWriter = inMemoryFileHelper.getWriter(targetFile)) {
                 targetFileWriter.write(csvContent);
             }
 
@@ -391,7 +391,7 @@ public class SynapseDownloadFromTableTaskTest {
 
             doAnswer(invocation -> {
                 File targetFile = invocation.getArgumentAt(1, File.class);
-                try (Writer targetFileWriter = mockFileHelper.getWriter(targetFile)) {
+                try (Writer targetFileWriter = inMemoryFileHelper.getWriter(targetFile)) {
                     targetFileWriter.write("dummy zip content");
                 }
 
@@ -406,7 +406,7 @@ public class SynapseDownloadFromTableTaskTest {
     // Direct string matching means we tightly couple to the CSV writer implementation. Instead, re-parse the file as a
     // CSV and check the values are what we expect.
     private List<String[]> parseCsv(File csvFile) throws Exception {
-        try (CsvNullReader csvFileReader = new CsvNullReader(mockFileHelper.getReader(csvFile))) {
+        try (CsvNullReader csvFileReader = new CsvNullReader(inMemoryFileHelper.getReader(csvFile))) {
             return csvFileReader.readAll();
         }
     }
@@ -416,16 +416,16 @@ public class SynapseDownloadFromTableTaskTest {
         // files up (which is what the packager would do) and then verify that the mock file system is now empty.
         if (result != null) {
             if (result.getCsvFile() != null) {
-                mockFileHelper.deleteFile(result.getCsvFile());
+                inMemoryFileHelper.deleteFile(result.getCsvFile());
             }
 
             if (result.getBulkDownloadFile() != null) {
-                mockFileHelper.deleteFile(result.getBulkDownloadFile());
+                inMemoryFileHelper.deleteFile(result.getBulkDownloadFile());
             }
         }
 
-        mockFileHelper.deleteDir(tmpDir);
-        assertTrue(mockFileHelper.isEmpty());
+        inMemoryFileHelper.deleteDir(tmpDir);
+        assertTrue(inMemoryFileHelper.isEmpty());
 
         // Validate the Synapse query contains the expected values. Don't string match the entire string. Just validate
         // that table ID, health code, start date, and end date were used.

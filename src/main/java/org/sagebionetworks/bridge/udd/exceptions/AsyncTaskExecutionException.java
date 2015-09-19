@@ -1,12 +1,12 @@
 package org.sagebionetworks.bridge.udd.exceptions;
 
 /**
- * This represents an exception in an asynchronous Runnable. This is a RuntimeException because Runnable doesn't
- * declare any checked exceptions. This is generally converted into an ExecutionException by the ExecutorService and
+ * This represents an exception in an asynchronous task, most frequently used to wrap lower-level exceptions and
+ * enhance their error messages. This is generally converted into an ExecutionException by the ExecutorService and
  * Future.get().
  */
 @SuppressWarnings("serial")
-public class AsyncTaskExecutionException extends RuntimeException {
+public class AsyncTaskExecutionException extends Exception {
     public AsyncTaskExecutionException() {
     }
 

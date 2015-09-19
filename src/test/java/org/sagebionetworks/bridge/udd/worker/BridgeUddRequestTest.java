@@ -11,37 +11,37 @@ import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
 @SuppressWarnings("unchecked")
 public class BridgeUddRequestTest {
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*studyId.*")
     public void nullStudyId() {
         new BridgeUddRequest.Builder().withUsername("test-username").withStartDate(LocalDate.parse("2015-08-15"))
                 .withEndDate(LocalDate.parse("2015-08-19")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*studyId.*")
     public void emptyStudyId() {
         new BridgeUddRequest.Builder().withStudyId("").withUsername("test-username")
                 .withStartDate(LocalDate.parse("2015-08-15")).withEndDate(LocalDate.parse("2015-08-19")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*username.*")
     public void nullUsername() {
         new BridgeUddRequest.Builder().withStudyId("test-study").withStartDate(LocalDate.parse("2015-08-15"))
                 .withEndDate(LocalDate.parse("2015-08-19")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*username.*")
     public void emptyUsername() {
         new BridgeUddRequest.Builder().withStudyId("test-study").withUsername("")
                 .withStartDate(LocalDate.parse("2015-08-15")).withEndDate(LocalDate.parse("2015-08-19")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*startDate.*")
     public void nullStartDate() {
         new BridgeUddRequest.Builder().withStudyId("test-study").withUsername("test-username")
                 .withEndDate(LocalDate.parse("2015-08-19")).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class)
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*endDate.*")
     public void nullEndDate() {
         new BridgeUddRequest.Builder().withStudyId("test-study").withUsername("test-username")
                 .withStartDate(LocalDate.parse("2015-08-15")).build();
