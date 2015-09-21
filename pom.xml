@@ -96,6 +96,11 @@
             <version>0.1.201508282331</version>
         </dependency>
         <dependency>
+            <groupId>org.sagebionetworks</groupId>
+            <artifactId>synapseJavaClient</artifactId>
+            <version>2015-09-11-1923-6f23893</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
@@ -119,6 +124,11 @@
     </dependencies>
 
     <repositories>
+        <repository>
+            <id>sagebionetworks-libs-releases-local</id>
+            <name>sagebionetworks-libs-releases-local</name>
+            <url>http://sagebionetworks.artifactoryonline.com/sagebionetworks/libs-releases-local</url>
+        </repository>
         <repository>
             <id>org-sagebridge-repo-maven-releases</id>
             <name>org-sagebridge-repo-maven-releases</name>
@@ -152,20 +162,20 @@
                         <!-- config is inherently not testable -->
                         <exclude>org/sagebionetworks/bridge/udd/config/*</exclude>
 
+                        <!-- no point in testing exceptions, since they are entirely boilerplate code -->
+                        <exclude>org/sagebionetworks/bridge/udd/exceptions/*</exclude>
+
                         <!--
                             Not worth including these in coverage, since this is entirely copy-pasta, and we're going
                             to refactor it soon.
                         -->
-                        <exclude>org/sagebionetworks/bridge/udd/crypto/*</exclude>
                         <exclude>org/sagebionetworks/bridge/udd/s3/S3Helper.class</exclude>
 
                         <!--
                             These helper classes are inherently untestable, since they exist solely to mock out static
                             methods or system access.
                          -->
-                        <exclude>org/sagebionetworks/bridge/udd/helper/DateTimeHelper.class</exclude>
                         <exclude>org/sagebionetworks/bridge/udd/helper/FileHelper.class</exclude>
-                        <exclude>org/sagebionetworks/bridge/udd/helper/WorkerLoopManager.class</exclude>
                     </excludes>
                     <rules>
                         <rule>
@@ -179,7 +189,7 @@
                                 <limit>
                                     <counter>BRANCH</counter>
                                     <value>COVEREDRATIO</value>
-                                    <minimum>0.70</minimum>
+                                    <minimum>0.75</minimum>
                                 </limit>
                             </limits>
                         </rule>

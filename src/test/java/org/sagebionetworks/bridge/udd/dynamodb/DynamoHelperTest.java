@@ -1,23 +1,43 @@
 package org.sagebionetworks.bridge.udd.dynamodb;
 
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.KeyConditions;
-import com.amazonaws.services.dynamodbv2.document.RangeKeyCondition;
 import com.amazonaws.services.dynamodbv2.document.Table;
-import org.joda.time.LocalDate;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
-import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
-
 public class DynamoHelperTest {
+    private static final String DUMMY_FIELD_DEF_LIST_JSON = "[\n" +
+            "   {\n" +
+            "       \"name\":\"dummy-field\",\n" +
+            "       \"type\":\"STRING\"\n" +
+            "   }\n" +
+            "]";
+
+    @Test
+    public void testGetHealthCode() {
+        // mock health ID table
+        Item mockItem = new Item().withString("code", "test-health-code");
+        Table mockHealthIdTable = mock(Table.class);
+        when(mockHealthIdTable.getItem("id", "test-health-id")).thenReturn(mockItem);
+
+        // set up dynamo helper
+        DynamoHelper dynamoHelper = new DynamoHelper();
+        dynamoHelper.setDdbHealthIdTable(mockHealthIdTable);
+
+        // execute and validate
+        assertEquals(dynamoHelper.getHealthCodeFromHealthId("test-health-id"), "test-health-code");
+    }
+
     @Test
     public void testGetStudy() {
         // mock study table
@@ -39,52 +59,67 @@ public class DynamoHelperTest {
     }
 
     @Test
-    public void testGetUploads() {
-        // mock upload index
-        List<Item> uploadList = new ArrayList<>();
-        uploadList.add(new Item().withString("uploadId", "foo-upload").withString("uploadDate", "2015-08-15"));
-        uploadList.add(new Item().withString("uploadId", "bar-upload").withString("uploadDate", "2015-08-17"));
-        uploadList.add(new Item().withString("uploadId", "baz-upload").withString("uploadDate", "2015-08-19"));
+    public void testGetSynapseTablesAndSchemas() throws Exception {
+        // There are 3 sub-cases to test here
+        // * foo schema has no table
+        // * bar schema has a table
+        // * qwerty and asdf schemas both point to the same table
 
-        // Index.query() can't be mocked, so override queryHelper to sidestep this problem
-        DynamoHelper testHelper = new DynamoHelper() {
-            @Override
-            protected Iterable<Item> queryHelper(String indexKeyName, Object indexKeyValue,
-                    RangeKeyCondition rangeKeyCondition) {
-                assertEquals(indexKeyName, "healthCode");
-                assertEquals(indexKeyValue, "dummy-health-code");
-                assertEquals(rangeKeyCondition.getAttrName(), "uploadDate");
-                assertEquals(rangeKeyCondition.getKeyCondition(), KeyConditions.BETWEEN);
-                assertEquals(rangeKeyCondition.getValues()[0], "2015-08-15");
-                assertEquals(rangeKeyCondition.getValues()[1], "2015-08-19");
-                return uploadList;
-            }
-        };
+        DynamoHelper dynamoHelper = spy(new DynamoHelper());
 
-        // mock health ID table
-        Item mockHealthIdItem = new Item().withString("code", "dummy-health-code");
-        Table mockHealthIdTable = mock(Table.class);
-        when(mockHealthIdTable.getItem("id", "dummy-health-id")).thenReturn(mockHealthIdItem);
-        testHelper.setDdbHealthIdTable(mockHealthIdTable);
+        // Mock Schema table Study index. This involves stubbing out queryHelper() because indices can't be mocked
+        // directly.
+        List<Item> mockSchemaStudyIndexResult = new ArrayList<>();
+        mockSchemaStudyIndexResult.add(makeUploadSchemaDdbItem("test-study", "foo", 1, null));
+        mockSchemaStudyIndexResult.add(makeUploadSchemaDdbItem("test-study", "bar", 2, null));
+        mockSchemaStudyIndexResult.add(makeUploadSchemaDdbItem("test-study", "qwerty", 3, null));
+        mockSchemaStudyIndexResult.add(makeUploadSchemaDdbItem("test-study", "asdf", 4, null));
 
-        // set up inputs
-        AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress("dummy-email@example.com")
-                .withHealthId("dummy-health-id").withUsername("dummy-username").build();
-        BridgeUddRequest request = new BridgeUddRequest.Builder().withStudyId("test-study")
-                .withUsername("dummy-username").withStartDate(LocalDate.parse("2015-08-15"))
-                .withEndDate(LocalDate.parse("2015-08-19")).build();
+        Index mockSchemaStudyIndex = mock(Index.class);
+        doReturn(mockSchemaStudyIndexResult).when(dynamoHelper).queryHelper(mockSchemaStudyIndex, "studyId",
+                "test-study", null);
+        dynamoHelper.setDdbUploadSchemaStudyIndex(mockSchemaStudyIndex);
 
-        // execute and validate
-        List<UploadInfo> uploadInfoList = testHelper.getUploadsForRequest(accountInfo, request);
-        assertEquals(uploadInfoList.size(), 3);
+        // mock schema table
+        Table mockSchemaTable = mock(Table.class);
+        when(mockSchemaTable.getItem("key", "test-study:foo", "revision", 1)).thenReturn(makeUploadSchemaDdbItem(
+                "test-study", "foo", 1, DUMMY_FIELD_DEF_LIST_JSON));
+        when(mockSchemaTable.getItem("key", "test-study:bar", "revision", 2)).thenReturn(makeUploadSchemaDdbItem(
+                "test-study", "bar", 2, DUMMY_FIELD_DEF_LIST_JSON));
+        when(mockSchemaTable.getItem("key", "test-study:qwerty", "revision", 3)).thenReturn(makeUploadSchemaDdbItem(
+                "test-study", "qwerty", 3, DUMMY_FIELD_DEF_LIST_JSON));
+        when(mockSchemaTable.getItem("key", "test-study:asdf", "revision", 4)).thenReturn(makeUploadSchemaDdbItem(
+                "test-study", "asdf", 4, DUMMY_FIELD_DEF_LIST_JSON));
+        dynamoHelper.setDdbUploadSchemaTable(mockSchemaTable);
 
-        assertEquals(uploadInfoList.get(0).getId(), "foo-upload");
-        assertEquals(uploadInfoList.get(0).getUploadDate().toString(), "2015-08-15");
+        // mock synapse map table
+        Table mockSynapseMapTable = mock(Table.class);
+        when(mockSynapseMapTable.getItem("schemaKey", "test-study-bar-v2")).thenReturn(makeSynapseMapDdbItem(
+                "test-study-bar-v2", "bar-table-id"));
+        when(mockSynapseMapTable.getItem("schemaKey", "test-study-qwerty-v3")).thenReturn(makeSynapseMapDdbItem(
+                "test-study-qwerty-v3", "qwerty-asdf-table-id"));
+        when(mockSynapseMapTable.getItem("schemaKey", "test-study-asdf-v4")).thenReturn(makeSynapseMapDdbItem(
+                "test-study-asdf-v4", "qwerty-asdf-table-id"));
+        dynamoHelper.setDdbSynapseMapTable(mockSynapseMapTable);
 
-        assertEquals(uploadInfoList.get(1).getId(), "bar-upload");
-        assertEquals(uploadInfoList.get(1).getUploadDate().toString(), "2015-08-17");
+        // execute and validate - Just check the key equals the schema we expect. Deep validation of schemas is done
+        // in the schema tests
+        Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy("test-study");
+        assertEquals(synapseToSchemaMap.size(), 2);
+        assertEquals(synapseToSchemaMap.get("bar-table-id").getKey().toString(), "test-study-bar-v2");
+        assertEquals(synapseToSchemaMap.get("qwerty-asdf-table-id").getKey().toString(), "test-study-asdf-v4");
+    }
 
-        assertEquals(uploadInfoList.get(2).getId(), "baz-upload");
-        assertEquals(uploadInfoList.get(2).getUploadDate().toString(), "2015-08-19");
+    private static Item makeUploadSchemaDdbItem(String studyId, String schemaId, int rev, String fieldDefListJson) {
+        Item retval = new Item().withString("studyId", studyId).withString("key", studyId + ":" + schemaId)
+                .withInt("revision", rev);
+        if (fieldDefListJson != null) {
+            retval.withString("fieldDefinitions", fieldDefListJson);
+        }
+        return retval;
+    }
+
+    private static Item makeSynapseMapDdbItem(String schemaKey, String synapseTableId) {
+        return new Item().withString("schemaKey", schemaKey).withString("tableId", synapseTableId);
     }
 }

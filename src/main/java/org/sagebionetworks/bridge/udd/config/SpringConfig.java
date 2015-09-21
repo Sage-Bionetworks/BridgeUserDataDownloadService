@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.document.DynamoDB;
@@ -12,13 +14,12 @@ import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
 import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.api.ApiKeys;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.sagebionetworks.client.SynapseAdminClientImpl;
+import org.sagebionetworks.client.SynapseClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -26,9 +27,7 @@ import org.springframework.context.annotation.Configuration;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
-import org.sagebionetworks.bridge.crypto.CmsEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
-import org.sagebionetworks.bridge.udd.crypto.CmsEncryptorCacheLoader;
 import org.sagebionetworks.bridge.udd.s3.S3Helper;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
@@ -38,10 +37,9 @@ import org.sagebionetworks.bridge.udd.s3.S3Helper;
 @ComponentScan("org.sagebionetworks.bridge.udd")
 @Configuration
 public class SpringConfig {
-    @Bean(name = "cmsEncryptorCache")
-    @Autowired
-    public LoadingCache<String, CmsEncryptor> cmsEncryptorCache(CmsEncryptorCacheLoader cacheLoader) {
-        return CacheBuilder.newBuilder().build(cacheLoader);
+    @Bean(name = "auxiliaryExecutorService")
+    public ExecutorService auxiliaryExecutorService() {
+        return Executors.newFixedThreadPool(environmentConfig().getInt("threadpool.aux.count"));
     }
 
     @Bean
@@ -67,14 +65,24 @@ public class SpringConfig {
         return ddbClient().getTable(ddbPrefix() + "Study");
     }
 
+    @Bean(name = "ddbSynapseMapTable")
+    public Table ddbSynapseMapTable() {
+        return ddbClient().getTable(environmentConfig().get("synapse.map.table"));
+    }
+
     @Bean(name = "ddbUploadTable")
     public Table ddbUploadTable() {
         return ddbClient().getTable(ddbPrefix() + "Upload2");
     }
 
-    @Bean(name = "ddbUploadTableIndex")
-    public Index ddbUploadTableIndex() {
-        return ddbUploadTable().getIndex("healthCode-uploadDate-index");
+    @Bean(name = "ddbUploadSchemaTable")
+    public Table ddbUploadSchemaTable() {
+        return ddbClient().getTable(ddbPrefix() + "UploadSchema");
+    }
+
+    @Bean(name = "ddbUploadSchemaStudyIndex")
+    public Index ddbUploadSchemaStudyIndex() {
+        return ddbUploadSchemaTable().getIndex("studyId-index");
     }
 
     private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
@@ -135,5 +143,15 @@ public class SpringConfig {
     @Bean
     public AmazonSQSClient sqsClient() {
         return new AmazonSQSClient();
+    }
+
+    @Bean
+    public SynapseClient synapseClient() {
+        Config envConfig = environmentConfig();
+
+        SynapseClient synapseClient = new SynapseAdminClientImpl();
+        synapseClient.setUserName(envConfig.get("synapse.user"));
+        synapseClient.setApiKey(envConfig.get("synapse.api.key"));
+        return synapseClient;
     }
 }

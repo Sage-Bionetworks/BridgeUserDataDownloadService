@@ -1,9 +1,16 @@
 package org.sagebionetworks.bridge.udd.helper;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
@@ -15,10 +22,37 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class FileHelper {
+    //
+    // The following methods should be mocked, as they represent primitive operations to the file system.
+    //
+
+    // CREATE
+
     /** Non-static createTempDir directory. */
     public File createTempDir() {
         return Files.createTempDir();
     }
+
+    /** Non-static File constructor. */
+    public File newFile(File parent, String filename) {
+        return new File(parent, filename);
+    }
+
+    // READ
+
+    /** Non-static get input (read) stream. */
+    public InputStream getInputStream(File file) throws FileNotFoundException {
+        return new FileInputStream(file);
+    }
+
+    // WRITE
+
+    /** Non-static get output (write) stream. */
+    public OutputStream getOutputStream(File file) throws FileNotFoundException {
+        return new FileOutputStream(file);
+    }
+
+    // DELETE
 
     /**
      * Delete the specified directory. This is used so that mock file systems can keep track of files. Even though
@@ -39,28 +73,36 @@ public class FileHelper {
         }
     }
 
-    /** Non-static get stream. */
-    public OutputStream getStream(File file) throws IOException {
-        return new FileOutputStream(file);
+    // MISC
+
+    /**
+     * Tests if the file exists. Should only be used for files, not for directories. This is because our mock file
+     * system tracks directories and files separately (to make it easier to mock and test).
+     */
+    public boolean fileExists(File file) {
+        return file.exists();
     }
 
-    /** Non-static File constructor. */
-    public File newFile(File parent, String filename) {
-        return new File(parent, filename);
+    /**
+     * Non-static move method. Should only be used for files and not directories. This is because our mock file system
+     * tracks directories and files separately (to make it easier to mock and test).
+     */
+    public void moveFiles(File from, File to) throws IOException {
+        Files.move(from, to);
     }
 
-    /** Non-static method to write bytes to the specified file. */
-    public void writeBytesToFile(byte[] from, File to) throws IOException {
-        Files.write(from, to);
+    //
+    // These methods can be built up from primitives. As such, they shouldn't be mocked. Rather you should mock the
+    // primitives and use the real implementations of these methods below.
+    //
+
+    /** Convenience method to get a reader. Calls through to {@link #getInputStream}. */
+    public final BufferedReader getReader(File file) throws FileNotFoundException {
+        return new BufferedReader(new InputStreamReader(getInputStream(file), Charsets.UTF_8));
     }
 
-    /** Non-static method to write from the specified file to the specified stream. */
-    public void writeFileToStream(File from, OutputStream to) throws IOException {
-        Files.copy(from, to);
-    }
-
-    /** Non-static method to write chars to the specified file, using UTF-8 encoding. */
-    public void writeStringToFile(String from, File to) throws IOException {
-        Files.write(from, to, Charsets.UTF_8);
+    /** Convenience method to get a writer. Calls through to {@link #getOutputStream}. */
+    public final BufferedWriter getWriter(File file) throws FileNotFoundException {
+        return new BufferedWriter(new OutputStreamWriter(getOutputStream(file), Charsets.UTF_8));
     }
 }
