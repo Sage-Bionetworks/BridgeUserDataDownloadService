@@ -11,9 +11,11 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.fail;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.amazonaws.services.sqs.model.Message;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.config.Config;
@@ -39,6 +41,7 @@ public class BridgeUddWorkerTest {
         // of instantiating all the fields.
         StudyInfo mockStudyInfo = mock(StudyInfo.class);
         Map<String, UploadSchema> mockSynapseToSchema = ImmutableMap.of();
+        Set<String> mockSurveyTableIdSet = ImmutableSet.of();
         PresignedUrlInfo mockPresignedUrlInfo = mock(PresignedUrlInfo.class);
 
         // non-mock test objects - We break inside these objects to get data.
@@ -74,6 +77,7 @@ public class BridgeUddWorkerTest {
         when(mockDynamoHelper.getStudy("test-study")).thenReturn(mockStudyInfo);
         when(mockDynamoHelper.getHealthCodeFromHealthId("test-health-id")).thenReturn("test-health-code");
         when(mockDynamoHelper.getSynapseTableIdsForStudy("test-study")).thenReturn(mockSynapseToSchema);
+        when(mockDynamoHelper.getSynapseSurveyTablesForStudy("test-study")).thenReturn(mockSurveyTableIdSet);
 
         // mock stormpath helper
         StormpathHelper mockStormpathHelper = mock(StormpathHelper.class);
@@ -82,7 +86,7 @@ public class BridgeUddWorkerTest {
         // mock Synapse packager
         SynapsePackager mockPackager = mock(SynapsePackager.class);
         when(mockPackager.packageSynapseData(same(mockSynapseToSchema), eq("test-health-code"),
-                any(BridgeUddRequest.class))).thenAnswer(invocation -> {
+                any(BridgeUddRequest.class), same(mockSurveyTableIdSet))).thenAnswer(invocation -> {
             // Second request is in March, that has no data. Third request is in August, that has data.
             BridgeUddRequest request = invocation.getArgumentAt(2, BridgeUddRequest.class);
             int startMonth = request.getStartDate().getMonthOfYear();

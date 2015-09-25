@@ -11,6 +11,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
@@ -21,13 +22,17 @@ import java.io.File;
 import java.io.Writer;
 import java.net.URL;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.HttpMethod;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeUtils;
 import org.joda.time.LocalDate;
@@ -65,17 +70,41 @@ public class SynapsePackagerTest {
     private byte[] s3FileBytes;
 
     @Test
+    public void noSchemas() throws Exception {
+        // setup test
+        Map<String, UploadSchema> synapseTableToSchema = ImmutableMap.of();
+        Map<String, SynapseTaskResultContent> synapseTableToResult = ImmutableMap.of();
+        Map<String, String> surveyTableToResultContent = ImmutableMap.of("test-survey", "dummy survey content");
+        Set<String> surveyTableIdSet = surveyTableToResultContent.keySet();
+        setupPackager(synapseTableToSchema, synapseTableToResult, null, surveyTableToResultContent, null);
+
+        // execute and validate
+        PresignedUrlInfo presignedUrlInfo = packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE,
+                TEST_UDD_REQUEST, surveyTableIdSet);
+        assertNull(presignedUrlInfo);
+
+        // validate S3 not called
+        verifyZeroInteractions(mockS3Helper);
+        assertNull(s3FileBytes);
+
+        // validate mock file helper is clean
+        assertTrue(inMemoryFileHelper.isEmpty());
+    }
+
+    @Test
     public void noFiles() throws Exception {
         // setup test
         // We don't care about data inside the schema. Use mock schemas.
         Map<String, UploadSchema> synapseTableToSchema = ImmutableMap.of("test-table-id", mock(UploadSchema.class));
         Map<String, SynapseTaskResultContent> synapseTableToResult = ImmutableMap.of("test-table-id",
                 new SynapseTaskResultContent(null, null, null, null));
-        setupPackager(synapseTableToSchema, synapseTableToResult, null);
+        Map<String, String> surveyTableToResultContent = ImmutableMap.of("test-survey", "dummy survey content");
+        Set<String> surveyTableIdSet = surveyTableToResultContent.keySet();
+        setupPackager(synapseTableToSchema, synapseTableToResult, null, surveyTableToResultContent, null);
 
         // execute and validate
         PresignedUrlInfo presignedUrlInfo = packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE,
-                TEST_UDD_REQUEST);
+                TEST_UDD_REQUEST, surveyTableIdSet);
         assertNull(presignedUrlInfo);
 
         // validate S3 not called
@@ -93,6 +122,8 @@ public class SynapsePackagerTest {
         // * task with CSV
         // * task with CSV and bulk download
         // * 2 tasks with errors (to make sure error messages are collated properly)
+        // * 2 surveys
+        // * 2 survey errors
 
         // setup test
         // We don't care about data inside the schema. Use mock schemas.
@@ -117,7 +148,21 @@ public class SynapsePackagerTest {
                 .put("error-table-2", new ExecutionException("test exception 2", null))
                 .build();
 
-        setupPackager(synapseTableToSchema, synapseTableToResult, synapseTableToException);
+        Map<String, String> surveyTableToResultContent = new ImmutableMap.Builder()
+                .put("foo-survey", "foo-survey dummy content")
+                .put("bar-survey", "bar-survey dummy content")
+                .build();
+
+        Map<String, ExecutionException> surveyTableToException = new ImmutableMap.Builder()
+                .put("error-survey-1", new ExecutionException("test survey exception 1", null))
+                .put("error-survey-2", new ExecutionException("test survey exception 2", null))
+                .build();
+
+        Set<String> surveyTableIdSet = new ImmutableSet.Builder().addAll(surveyTableToResultContent.keySet())
+                .addAll(surveyTableToException.keySet()).build();
+
+        setupPackager(synapseTableToSchema, synapseTableToResult, synapseTableToException, surveyTableToResultContent,
+                surveyTableToException);
 
         // mock pre-signed URL call
         ArgumentCaptor<DateTime> expirationTimeCaptor = ArgumentCaptor.forClass(DateTime.class);
@@ -127,21 +172,65 @@ public class SynapsePackagerTest {
         // execute and validate
         long expectedExpirationTimeMillis = MOCK_NOW.plusHours(URL_EXPIRATION_HOURS).getMillis();
         PresignedUrlInfo presignedUrlInfo = packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE,
-                TEST_UDD_REQUEST);
+                TEST_UDD_REQUEST, surveyTableIdSet);
         assertEquals(presignedUrlInfo.getUrl().toString(), "http://example.com/");
         assertEquals(presignedUrlInfo.getExpirationTime().getMillis(), expectedExpirationTimeMillis);
 
         // validate uploaded S3 file
         Map<String, String> unzippedMap = ZipHelperTest.unzipHelper(s3FileBytes);
-        assertEquals(unzippedMap.size(), 4);
+        assertEquals(unzippedMap.size(), 7);
         assertEquals(unzippedMap.get("csv-only.csv"), "csv-only dummy csv");
         assertEquals(unzippedMap.get("csv-and-bulk-download.csv"), "csv-and-bulk-download dummy csv");
         assertEquals(unzippedMap.get("csv-and-bulk-download.zip"), "csv-and-bulk-download dummy zip");
+        assertEquals(unzippedMap.get("foo-survey.csv"), "foo-survey dummy content");
+        assertEquals(unzippedMap.get("bar-survey.csv"), "bar-survey dummy content");
 
         // For the error log, instead of exact string matching, just make sure it contains our error messages.
         String errorLogContent = unzippedMap.get(SynapsePackager.ERROR_LOG_FILE_NAME);
         assertTrue(errorLogContent.contains("test exception 1"));
         assertTrue(errorLogContent.contains("test exception 2"));
+
+        String metadataErrorLogContent = unzippedMap.get(SynapsePackager.METADATA_ERROR_LOG_FILE_NAME);
+        assertTrue(metadataErrorLogContent.contains("test survey exception 1"));
+        assertTrue(metadataErrorLogContent.contains("test survey exception 2"));
+
+        // validate expiration time
+        DateTime expirationTime = expirationTimeCaptor.getValue();
+        assertEquals(expirationTime.getMillis(), expectedExpirationTimeMillis);
+
+        // validate mock file helper is clean
+        assertTrue(inMemoryFileHelper.isEmpty());
+    }
+
+    @Test
+    public void noSurveys() throws Exception {
+        // setup test
+        // We don't care about data inside the schema. Use mock schemas.
+        Map<String, UploadSchema> synapseTableToSchema = ImmutableMap.of("test-table-id", mock(UploadSchema.class));
+        Map<String, SynapseTaskResultContent> synapseTableToResult = ImmutableMap.of("test-table-id",
+                new SynapseTaskResultContent("test-table.csv", "dummy csv content", "test-table.zip",
+                        "dummy zip content"));
+        Map<String, String> surveyTableToResultContent = ImmutableMap.of();
+        Set<String> surveyTableIdSet = surveyTableToResultContent.keySet();
+        setupPackager(synapseTableToSchema, synapseTableToResult, null, surveyTableToResultContent, null);
+
+        // mock pre-signed URL call
+        ArgumentCaptor<DateTime> expirationTimeCaptor = ArgumentCaptor.forClass(DateTime.class);
+        when(mockS3Helper.generatePresignedUrl(eq(DUMMY_USER_DATA_BUCKET), startsWith(TEST_MASTER_ZIP_FILE_PREFIX),
+                expirationTimeCaptor.capture(), eq(HttpMethod.GET))).thenReturn(new URL("http://example.com/"));
+
+        // execute and validate
+        long expectedExpirationTimeMillis = MOCK_NOW.plusHours(URL_EXPIRATION_HOURS).getMillis();
+        PresignedUrlInfo presignedUrlInfo = packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE,
+                TEST_UDD_REQUEST, surveyTableIdSet);
+        assertEquals(presignedUrlInfo.getUrl().toString(), "http://example.com/");
+        assertEquals(presignedUrlInfo.getExpirationTime().getMillis(), expectedExpirationTimeMillis);
+
+        // validate uploaded S3 file
+        Map<String, String> unzippedMap = ZipHelperTest.unzipHelper(s3FileBytes);
+        assertEquals(unzippedMap.size(), 2);
+        assertEquals(unzippedMap.get("test-table.csv"), "dummy csv content");
+        assertEquals(unzippedMap.get("test-table.zip"), "dummy zip content");
 
         // validate expiration time
         DateTime expirationTime = expirationTimeCaptor.getValue();
@@ -154,7 +243,7 @@ public class SynapsePackagerTest {
     @Test
     public void firstErrorCase() throws Exception {
         // Test getting an error on the first step. The easiest way to inject the exception is to spy the packager and
-        // make initAsyncTasks throw a RuntimeException.
+        // make initAsyncQueryTasks throw a RuntimeException.
 
         // set up inputs
         // We don't care about data inside the schema. Use mock schemas.
@@ -162,8 +251,8 @@ public class SynapsePackagerTest {
 
         // set up mocks - We bypass most of the stuff in setupPackager()
         packager = spy(new SynapsePackager());
-        doThrow(RuntimeException.class).when(packager).initAsyncTasks(same(synapseTableToSchema), eq(TEST_HEALTH_CODE),
-                same(TEST_UDD_REQUEST), any(File.class));
+        doThrow(RuntimeException.class).when(packager).initAsyncQueryTasks(same(synapseTableToSchema),
+                eq(TEST_HEALTH_CODE), same(TEST_UDD_REQUEST), any(File.class));
 
         inMemoryFileHelper = new InMemoryFileHelper();
         packager.setFileHelper(inMemoryFileHelper);
@@ -171,7 +260,8 @@ public class SynapsePackagerTest {
         // execute
         Exception thrownEx = null;
         try {
-            packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE, TEST_UDD_REQUEST);
+            packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE, TEST_UDD_REQUEST,
+                    ImmutableSet.of("test-survey"));
             fail("expected exception");
         } catch (RuntimeException ex) {
             thrownEx = ex;
@@ -192,7 +282,9 @@ public class SynapsePackagerTest {
         Map<String, SynapseTaskResultContent> synapseTableToResult = ImmutableMap.of("test-table-id",
                 new SynapseTaskResultContent("csv.csv", "dummy csv content", "bulkdownload.zip",
                         "dummy bulk download content"));
-        setupPackager(synapseTableToSchema, synapseTableToResult, null);
+        Map<String, String> surveyTableToResultContent = ImmutableMap.of("test-survey", "dummy survey content");
+        Set<String> surveyTableIdSet = surveyTableToResultContent.keySet();
+        setupPackager(synapseTableToSchema, synapseTableToResult, null, surveyTableToResultContent, null);
 
         // mock pre-signed URL call
         ArgumentCaptor<DateTime> expirationTimeCaptor = ArgumentCaptor.forClass(DateTime.class);
@@ -202,7 +294,7 @@ public class SynapsePackagerTest {
         // execute
         Exception thrownEx = null;
         try {
-            packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE, TEST_UDD_REQUEST);
+            packager.packageSynapseData(synapseTableToSchema, TEST_HEALTH_CODE, TEST_UDD_REQUEST, surveyTableIdSet);
             fail("expected exception");
         } catch (AmazonClientException ex) {
             thrownEx = ex;
@@ -211,9 +303,10 @@ public class SynapsePackagerTest {
 
         // validate uploaded S3 file
         Map<String, String> unzippedMap = ZipHelperTest.unzipHelper(s3FileBytes);
-        assertEquals(unzippedMap.size(), 2);
+        assertEquals(unzippedMap.size(), 3);
         assertEquals(unzippedMap.get("csv.csv"), "dummy csv content");
         assertEquals(unzippedMap.get("bulkdownload.zip"), "dummy bulk download content");
+        assertEquals(unzippedMap.get("test-survey.csv"), "dummy survey content");
 
         // validate expiration time
         DateTime expirationTime = expirationTimeCaptor.getValue();
@@ -225,7 +318,8 @@ public class SynapsePackagerTest {
 
     private void setupPackager(Map<String, UploadSchema> synapseTableToSchema,
             Map<String, SynapseTaskResultContent> synapseTableToResult,
-            Map<String, ExecutionException> synapseTableToException) {
+            Map<String, ExecutionException> synapseTableToException, Map<String, String> surveyTableToResultContent,
+            Map<String, ExecutionException> surveyTableToException) {
         // spy "now" and replace it with MOCK_NOW
         packager = new SynapsePackager();
 
@@ -241,48 +335,85 @@ public class SynapsePackagerTest {
 
         // mock executor service to just call the callables directly
         ExecutorService mockExecutorService = mock(ExecutorService.class);
-        when(mockExecutorService.submit(any(SynapseDownloadFromTableTask.class))).then(invocation -> {
-            // validate params
-            SynapseDownloadFromTableTask task = invocation.getArgumentAt(0, SynapseDownloadFromTableTask.class);
-            SynapseDownloadFromTableParameters params = task.getParameters();
-            String synapseTableId = params.getSynapseTableId();
-            File tmpDir = params.getTempDir();
-
-            assertEquals(params.getHealthCode(), TEST_HEALTH_CODE);
-            assertEquals(params.getStartDate().toString(), TEST_START_DATE);
-            assertEquals(params.getEndDate().toString(), TEST_END_DATE);
-            assertNotNull(tmpDir);
-            assertSame(params.getSchema(), synapseTableToSchema.get(synapseTableId));
-
-            Future<SynapseDownloadFromTableResult> mockFuture = mock(Future.class);
-
-            // If we have an exception in the exception map, the future should throw that.
-            if (synapseTableToException != null) {
-                ExecutionException ex = synapseTableToException.get(synapseTableId);
-                if (ex != null) {
-                    when(mockFuture.get()).thenThrow(ex);
-                    return mockFuture;
-                }
-            }
-
-            // create a mock Future that returns the result from the synapseTableToResult map
-            SynapseTaskResultContent taskResultContent = synapseTableToResult.get(synapseTableId);
-            SynapseDownloadFromTableResult.Builder taskResultBuilder = new SynapseDownloadFromTableResult.Builder();
-            if (taskResultContent.getCsvFileContent() != null) {
-                File csvFile = createFileWithContent(tmpDir, taskResultContent.getCsvFileName(),
-                        taskResultContent.getCsvFileContent());
-                taskResultBuilder.withCsvFile(csvFile);
-            }
-            if (taskResultContent.getBulkDownloadFileContent() != null) {
-                File bulkDownloadFile = createFileWithContent(tmpDir, taskResultContent.getBulkDownloadFileName(),
-                        taskResultContent.getBulkDownloadFileContent());
-                taskResultBuilder.withBulkDownloadFile(bulkDownloadFile);
-            }
-
-            when(mockFuture.get()).thenReturn(taskResultBuilder.build());
-            return mockFuture;
-        });
         packager.setAuxiliaryExecutorService(mockExecutorService);
+
+        // mock executor - Because of the way Mockito works, we can only put one Answer on the mock. So the answer
+        // needs to get the Callable, check it's type, and multiplex accordingly.
+        when(mockExecutorService.submit(any(Callable.class))).then(invocation -> {
+            Callable<?> callable = invocation.getArgumentAt(0, Callable.class);
+            if (callable instanceof SynapseDownloadFromTableTask) {
+                // validate params
+                SynapseDownloadFromTableTask task = (SynapseDownloadFromTableTask) callable;
+                SynapseDownloadFromTableParameters params = task.getParameters();
+                String synapseTableId = params.getSynapseTableId();
+                File tmpDir = params.getTempDir();
+
+                assertEquals(params.getHealthCode(), TEST_HEALTH_CODE);
+                assertEquals(params.getStartDate().toString(), TEST_START_DATE);
+                assertEquals(params.getEndDate().toString(), TEST_END_DATE);
+                assertNotNull(tmpDir);
+                assertSame(params.getSchema(), synapseTableToSchema.get(synapseTableId));
+
+                Future<SynapseDownloadFromTableResult> mockFuture = mock(Future.class);
+
+                // If we have an exception in the exception map, the future should throw that.
+                if (synapseTableToException != null) {
+                    ExecutionException ex = synapseTableToException.get(synapseTableId);
+                    if (ex != null) {
+                        when(mockFuture.get()).thenThrow(ex);
+                        return mockFuture;
+                    }
+                }
+
+                // create a mock Future that returns the result from the synapseTableToResult map
+                SynapseTaskResultContent taskResultContent = synapseTableToResult.get(synapseTableId);
+                SynapseDownloadFromTableResult.Builder taskResultBuilder =
+                        new SynapseDownloadFromTableResult.Builder();
+                if (taskResultContent.getCsvFileContent() != null) {
+                    File csvFile = createFileWithContent(tmpDir, taskResultContent.getCsvFileName(),
+                            taskResultContent.getCsvFileContent());
+                    taskResultBuilder.withCsvFile(csvFile);
+                }
+                if (taskResultContent.getBulkDownloadFileContent() != null) {
+                    File bulkDownloadFile = createFileWithContent(tmpDir, taskResultContent.getBulkDownloadFileName(),
+                            taskResultContent.getBulkDownloadFileContent());
+                    taskResultBuilder.withBulkDownloadFile(bulkDownloadFile);
+                }
+
+                when(mockFuture.get()).thenReturn(taskResultBuilder.build());
+                return mockFuture;
+            } else if (callable instanceof SynapseDownloadSurveyTask) {
+                // validate params
+                SynapseDownloadSurveyTask task = invocation.getArgumentAt(0, SynapseDownloadSurveyTask.class);
+                SynapseDownloadSurveyParameters params = task.getParameters();
+                String synapseTableId = params.getSynapseTableId();
+                assertFalse(Strings.isNullOrEmpty(synapseTableId));
+                File tmpDir = params.getTempDir();
+                assertNotNull(tmpDir);
+
+                Future<File> mockFuture = mock(Future.class);
+
+                // If we have an exception in the exception map, the future should throw that.
+                if (surveyTableToException != null) {
+                    ExecutionException ex = surveyTableToException.get(synapseTableId);
+                    if (ex != null) {
+                        when(mockFuture.get()).thenThrow(ex);
+                        return mockFuture;
+                    }
+                }
+
+                // create a mock Future that returns the result from the surveyTableToResultContent map
+                String resultContent = surveyTableToResultContent.get(synapseTableId);
+                File resultFile = createFileWithContent(tmpDir, synapseTableId + ".csv", resultContent);
+                when(mockFuture.get()).thenReturn(resultFile);
+                return mockFuture;
+            } else {
+                fail("Unexpected task type: " + callable.getClass().getName());
+
+                // Java doesn't know this is unreachable. Return null.
+                return null;
+            }
+        });
 
         // Use real zip helper. It's easier to use the real one than to mock it out.
         ZipHelper zipHelper = new ZipHelper();

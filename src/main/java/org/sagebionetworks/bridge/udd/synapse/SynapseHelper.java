@@ -14,6 +14,7 @@ import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileHandleAssociateType;
 import org.sagebionetworks.repo.model.file.FileHandleAssociation;
 import org.sagebionetworks.repo.model.table.DownloadFromTableResult;
+import org.sagebionetworks.repo.model.table.TableEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -124,6 +125,20 @@ public class SynapseHelper {
         DownloadFromTableResult result = pollAsync(() ->
                 synapseClient.downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId));
         return result.getResultsFileHandleId();
+    }
+
+    /**
+     * Convenience method to get a table entity. This exists mainly so all Synapse calls go through the helper, instead
+     * of forcing callers to sometimes use the helper and sometimes use the client. This also enables retry logic.
+     *
+     * @param tableId
+     *         ID of table to fetch
+     * @return table entity
+     * @throws SynapseException
+     *         if the Synapse call fails
+     */
+    public TableEntity getTable(String tableId) throws SynapseException {
+        return synapseClient.getEntity(tableId, TableEntity.class);
     }
 
     /**

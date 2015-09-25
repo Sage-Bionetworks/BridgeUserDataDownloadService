@@ -1,6 +1,7 @@
 package org.sagebionetworks.bridge.udd.worker;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.amazonaws.services.sqs.model.Message;
@@ -127,8 +128,9 @@ public class BridgeUddWorker implements Runnable {
                     AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
                     String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
                     Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
+                    Set<String> surveyTableIdSet = dynamoHelper.getSynapseSurveyTablesForStudy(studyId);
                     PresignedUrlInfo presignedUrlInfo = synapsePackager.packageSynapseData(synapseToSchemaMap,
-                            healthCode, request);
+                            healthCode, request, surveyTableIdSet);
 
                     if (presignedUrlInfo == null) {
                         LOG.info("No data for request for hash[username]=" + userHash + ", study=" + studyId +

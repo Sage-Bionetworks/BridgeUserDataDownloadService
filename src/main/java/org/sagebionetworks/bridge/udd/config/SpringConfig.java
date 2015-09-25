@@ -70,9 +70,9 @@ public class SpringConfig {
         return ddbClient().getTable(environmentConfig().get("synapse.map.table"));
     }
 
-    @Bean(name = "ddbUploadTable")
-    public Table ddbUploadTable() {
-        return ddbClient().getTable(ddbPrefix() + "Upload2");
+    @Bean(name = "ddbSynapseSurveyTable")
+    public Table ddbSynapseSurveyTable() {
+        return ddbClient().getTable(ddbPrefix() + "SynapseSurveyTables");
     }
 
     @Bean(name = "ddbUploadSchemaTable")
