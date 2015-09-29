@@ -395,12 +395,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
                 // No file. No need to cleanup.
                 continue;
             }
-
-            try {
-                fileHelper.deleteFile(oneFileToDelete);
-            } catch (IOException ex) {
-                LOG.error("Error deleting file " + oneFileToDelete.getAbsolutePath());
-            }
+            fileHelper.deleteFile(oneFileToDelete);
         }
     }
 

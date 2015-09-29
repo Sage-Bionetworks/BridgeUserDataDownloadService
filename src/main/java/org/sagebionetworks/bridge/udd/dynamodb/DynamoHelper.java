@@ -23,7 +23,7 @@ public class DynamoHelper {
     private Table ddbHealthIdTable;
     private Table ddbStudyTable;
     private Table ddbSynapseMapTable;
-    private Table ddbSynapseSurveyTable;
+    private Table ddbSynapseSurveyTablesTable;
     private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
 
@@ -45,10 +45,14 @@ public class DynamoHelper {
         this.ddbSynapseMapTable = ddbSynapseMapTable;
     }
 
-    /** DDB table that gets the list of all survey tables for a given study. */
-    @Resource(name = "ddbSynapseSurveyTable")
-    public final void setDdbSynapseSurveyTable(Table ddbSynapseSurveyTable) {
-        this.ddbSynapseSurveyTable = ddbSynapseSurveyTable;
+    /**
+     * DDB table that gets the list of all survey tables for a given study. Naming note: This is a DDB table containing
+     * references to a set of Synapse tables. The name is a bit confusing,  but I'm not sure how to make it less
+     * confusing.
+     */
+    @Resource(name = "ddbSynapseSurveyTablesTable")
+    public final void setDdbSynapseSurveyTablesTable(Table ddbSynapseSurveyTablesTable) {
+        this.ddbSynapseSurveyTablesTable = ddbSynapseSurveyTablesTable;
     }
 
     /** Upload schema table. */
@@ -102,7 +106,7 @@ public class DynamoHelper {
      * @return set of survey table IDs, may be empty, but will never be null
      */
     public Set<String> getSynapseSurveyTablesForStudy(String studyId) {
-        Item item = ddbSynapseSurveyTable.getItem("studyId", studyId);
+        Item item = ddbSynapseSurveyTablesTable.getItem("studyId", studyId);
         if (item == null) {
             return ImmutableSet.of();
         }

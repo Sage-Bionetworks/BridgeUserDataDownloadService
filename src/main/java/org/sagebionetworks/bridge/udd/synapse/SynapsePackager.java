@@ -258,6 +258,11 @@ public class SynapsePackager {
                 String errorMsg = "Error downloading CSV: " + ex.getMessage();
                 LOG.error(errorMsg, ex);
                 errorList.add(errorMsg);
+
+                // Thread bookkeeping. Might be relevant in the future.
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
 
@@ -293,6 +298,11 @@ public class SynapsePackager {
                 String errorMsg = "Error downloading survey: " + ex.getMessage();
                 LOG.error(errorMsg, ex);
                 errorList.add(errorMsg);
+
+                // Thread bookkeeping. Might be relevant in the future.
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
 
@@ -410,19 +420,10 @@ public class SynapsePackager {
                 // No file. No need to cleanup.
                 continue;
             }
-
-            try {
-                fileHelper.deleteFile(oneFileToDelete);
-            } catch (IOException ex) {
-                LOG.error("Error deleting file " + oneFileToDelete.getAbsolutePath());
-            }
+            fileHelper.deleteFile(oneFileToDelete);
         }
 
         // clean up temp dir
-        try {
-            fileHelper.deleteDir(tmpDir);
-        } catch (IOException ex) {
-            LOG.error("Error deleting temp dir " + tmpDir.getAbsolutePath());
-        }
+        fileHelper.deleteDir(tmpDir);
     }
 }

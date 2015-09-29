@@ -1,7 +1,6 @@
 package org.sagebionetworks.bridge.udd.synapse;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -76,11 +75,7 @@ public class SynapseDownloadSurveyTask implements Callable<File> {
         } catch (AsyncTimeoutException | SynapseException | RuntimeException ex) {
             // cleanup file (if it were partially started and not finished)
             if (fileHelper.fileExists(surveyFile)) {
-                try {
-                    fileHelper.deleteFile(surveyFile);
-                } catch (IOException ioEx) {
-                    LOG.error("Error deleting file " + surveyFilePath);
-                }
+                fileHelper.deleteFile(surveyFile);
             }
 
             throw ex;

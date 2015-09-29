@@ -70,7 +70,7 @@ public class DynamoHelperTest {
 
         // set up dynamo helper
         DynamoHelper helper = new DynamoHelper();
-        helper.setDdbSynapseSurveyTable(mockSynapseSurveyTable);
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
 
         // execute and validate
         Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
@@ -88,7 +88,7 @@ public class DynamoHelperTest {
 
         // set up dynamo helper
         DynamoHelper helper = new DynamoHelper();
-        helper.setDdbSynapseSurveyTable(mockSynapseSurveyTable);
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
 
         // execute and validate
         Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
@@ -103,7 +103,7 @@ public class DynamoHelperTest {
 
         // set up dynamo helper
         DynamoHelper helper = new DynamoHelper();
-        helper.setDdbSynapseSurveyTable(mockSynapseSurveyTable);
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
 
         // execute and validate
         Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
