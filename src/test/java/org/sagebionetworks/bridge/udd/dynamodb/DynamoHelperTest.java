@@ -5,10 +5,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
@@ -56,6 +58,56 @@ public class DynamoHelperTest {
         assertEquals(studyInfo.getName(), "Test Study");
         assertEquals(studyInfo.getStormpathHref(), "dummy-stormpath-href");
         assertEquals(studyInfo.getSupportEmail(), "support@sagebase.org");
+    }
+
+    @Test
+    public void testGetSynapseSurveyTables() {
+        // mock Synapse survey table
+        Item mockItem = new Item().withString("studyId", "test-study").withStringSet("tableIdSet", "foo-table",
+                "bar-table");
+        Table mockSynapseSurveyTable = mock(Table.class);
+        when(mockSynapseSurveyTable.getItem("studyId", "test-study")).thenReturn(mockItem);
+
+        // set up dynamo helper
+        DynamoHelper helper = new DynamoHelper();
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
+
+        // execute and validate
+        Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
+        assertEquals(tableIdSet.size(), 2);
+        assertTrue(tableIdSet.contains("foo-table"));
+        assertTrue(tableIdSet.contains("bar-table"));
+    }
+
+    @Test
+    public void testGetSynapseSurveyTablesNoTableIds() {
+        // mock Synapse survey table
+        Item mockItem = new Item().withString("studyId", "test-study");
+        Table mockSynapseSurveyTable = mock(Table.class);
+        when(mockSynapseSurveyTable.getItem("studyId", "test-study")).thenReturn(mockItem);
+
+        // set up dynamo helper
+        DynamoHelper helper = new DynamoHelper();
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
+
+        // execute and validate
+        Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
+        assertTrue(tableIdSet.isEmpty());
+    }
+
+    @Test
+    public void testGetSynapseSurveyTablesNoItem() {
+        // mock Synapse survey table
+        Table mockSynapseSurveyTable = mock(Table.class);
+        when(mockSynapseSurveyTable.getItem("studyId", "test-study")).thenReturn(null);
+
+        // set up dynamo helper
+        DynamoHelper helper = new DynamoHelper();
+        helper.setDdbSynapseSurveyTablesTable(mockSynapseSurveyTable);
+
+        // execute and validate
+        Set<String> tableIdSet = helper.getSynapseSurveyTablesForStudy("test-study");
+        assertTrue(tableIdSet.isEmpty());
     }
 
     @Test

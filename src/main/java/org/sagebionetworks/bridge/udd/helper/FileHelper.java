@@ -14,6 +14,8 @@ import java.io.OutputStreamWriter;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.Files;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -22,6 +24,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class FileHelper {
+    private static final Logger LOG = LoggerFactory.getLogger(FileHelper.class);
+
     //
     // The following methods should be mocked, as they represent primitive operations to the file system.
     //
@@ -58,18 +62,18 @@ public class FileHelper {
      * Delete the specified directory. This is used so that mock file systems can keep track of files. Even though
      * this is identical to deleteFile(), having a separate deleteDir() makes mocking and testing easier.
      */
-    public void deleteDir(File dir) throws IOException {
+    public void deleteDir(File dir) {
         boolean success = dir.delete();
         if (!success) {
-            throw new IOException("Failed to delete directory: " + dir.getName());
+            LOG.error("Failed to delete directory: " + dir.getAbsolutePath());
         }
     }
 
     /** Delete the specified file. This is used so that mock file systems can keep track of files. */
-    public void deleteFile(File file) throws IOException {
+    public void deleteFile(File file) {
         boolean success = file.delete();
         if (!success) {
-            throw new IOException("Failed to delete file: " + file.getName());
+            LOG.error("Failed to delete file: " + file.getAbsolutePath());
         }
     }
 

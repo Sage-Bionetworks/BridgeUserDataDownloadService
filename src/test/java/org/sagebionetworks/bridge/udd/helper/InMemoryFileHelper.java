@@ -66,20 +66,24 @@ public class InMemoryFileHelper extends FileHelper {
 
     // DELETE
 
+    // Throws IllegalArgumentException because even though the prod method logs exceptions and swallows them, we want
+    // our tests to fail if we try to delete a non-existent file.
     @Override
-    public void deleteDir(File dir) throws FileNotFoundException {
+    public void deleteDir(File dir) {
         String dirPath = dir.getAbsolutePath();
         if (!dirSet.contains(dirPath)) {
-            throw new FileNotFoundException("Can't deleted dir " + dirPath + ": dir doesn't exist");
+            throw new IllegalArgumentException("Can't deleted dir " + dirPath + ": dir doesn't exist");
         }
         dirSet.remove(dirPath);
     }
 
+    // Throws IllegalArgumentException because even though the prod method logs exceptions and swallows them, we want
+    // our tests to fail if we try to delete a non-existent file.
     @Override
-    public void deleteFile(File file) throws FileNotFoundException {
+    public void deleteFile(File file) {
         String filePath = file.getAbsolutePath();
         if (!fileMap.containsKey(filePath)) {
-            throw new FileNotFoundException("Can't delete file " + filePath + ": file doesn't exist");
+            throw new IllegalArgumentException("Can't delete file " + filePath + ": file doesn't exist");
         }
         fileMap.remove(filePath);
     }

@@ -70,9 +70,11 @@ public class SpringConfig {
         return ddbClient().getTable(environmentConfig().get("synapse.map.table"));
     }
 
-    @Bean(name = "ddbUploadTable")
-    public Table ddbUploadTable() {
-        return ddbClient().getTable(ddbPrefix() + "Upload2");
+    // Naming note: This is a DDB table containing references to a set of Synapse tables. The name is a bit confusing,
+    // but I'm not sure how to make it less confusing.
+    @Bean(name = "ddbSynapseSurveyTablesTable")
+    public Table ddbSynapseSurveyTablesTable() {
+        return ddbClient().getTable(ddbPrefix() + "SynapseSurveyTables");
     }
 
     @Bean(name = "ddbUploadSchemaTable")

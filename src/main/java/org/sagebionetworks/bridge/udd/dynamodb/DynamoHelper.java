@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Resource;
 
 import com.amazonaws.services.dynamodbv2.document.Index;
@@ -12,6 +13,7 @@ import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.RangeKeyCondition;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,7 @@ public class DynamoHelper {
     private Table ddbHealthIdTable;
     private Table ddbStudyTable;
     private Table ddbSynapseMapTable;
+    private Table ddbSynapseSurveyTablesTable;
     private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
 
@@ -40,6 +43,16 @@ public class DynamoHelper {
     @Resource(name = "ddbSynapseMapTable")
     public final void setDdbSynapseMapTable(Table ddbSynapseMapTable) {
         this.ddbSynapseMapTable = ddbSynapseMapTable;
+    }
+
+    /**
+     * DDB table that gets the list of all survey tables for a given study. Naming note: This is a DDB table containing
+     * references to a set of Synapse tables. The name is a bit confusing,  but I'm not sure how to make it less
+     * confusing.
+     */
+    @Resource(name = "ddbSynapseSurveyTablesTable")
+    public final void setDdbSynapseSurveyTablesTable(Table ddbSynapseSurveyTablesTable) {
+        this.ddbSynapseSurveyTablesTable = ddbSynapseSurveyTablesTable;
     }
 
     /** Upload schema table. */
@@ -86,12 +99,33 @@ public class DynamoHelper {
     }
 
     /**
+     * Gets the set of survey table IDs for a given study.
+     *
+     * @param studyId
+     *         ID of study to get survey tables
+     * @return set of survey table IDs, may be empty, but will never be null
+     */
+    public Set<String> getSynapseSurveyTablesForStudy(String studyId) {
+        Item item = ddbSynapseSurveyTablesTable.getItem("studyId", studyId);
+        if (item == null) {
+            return ImmutableSet.of();
+        }
+
+        Set<String> tableIdSet = item.getStringSet("tableIdSet");
+        if (tableIdSet == null) {
+            return ImmutableSet.of();
+        }
+
+        return tableIdSet;
+    }
+
+    /**
      * Gets the Synapse table IDs associated with this study. The results are returned as a map from the Synapse table
      * IDs to the Bridge upload schemas.
      *
      * @param studyId
      *         ID of the study to query on
-     * @return map from the Synapse table IDs to the Bridge upload schema keys
+     * @return map from the Synapse table IDs to the Bridge upload schema keys, may be empty, but will never be null
      */
     public Map<String, UploadSchema> getSynapseTableIdsForStudy(String studyId) throws IOException {
         // query and iterate
