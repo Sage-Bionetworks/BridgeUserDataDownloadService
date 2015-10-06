@@ -61,6 +61,12 @@
             <version>18.0</version>
         </dependency>
         <dependency>
+            <groupId>com.logentries</groupId>
+            <artifactId>logentries-appender</artifactId>
+            <version>RELEASE</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
             <groupId>com.stormpath.sdk</groupId>
             <artifactId>stormpath-sdk-api</artifactId>
             <version>${stormpath.version}</version>
