@@ -5,12 +5,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.concurrent.TimeUnit;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.base.Charsets;
 import com.google.common.io.ByteStreams;
+import com.jcabi.aspects.RetryOnFailure;
 import org.joda.time.DateTime;
 
 /**
@@ -59,6 +62,8 @@ public class S3Helper {
      * @throws IOException
      *         if closing the stream fails
      */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = AmazonClientException.class,
+            randomize = false)
     public byte[] readS3FileAsBytes(String bucket, String key) throws IOException {
         S3Object s3File = s3Client.getObject(bucket, key);
         try (InputStream s3Stream = s3File.getObjectContent()) {
@@ -94,6 +99,8 @@ public class S3Helper {
      * @throws IOException
      *         if uploading the byte stream fails
      */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = AmazonClientException.class,
+            randomize = false)
     public void writeBytesToS3(String bucket, String key, byte[] data) throws IOException {
         try (InputStream dataInputStream = new ByteArrayInputStream(data)) {
             s3Client.putObject(bucket, key, dataInputStream, null);
@@ -112,6 +119,8 @@ public class S3Helper {
      * @param file
      *         file to upload
      */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = AmazonClientException.class,
+            randomize = false)
     public void writeFileToS3(String bucket, String key, File file) {
         s3Client.putObject(bucket, key, file);
     }
