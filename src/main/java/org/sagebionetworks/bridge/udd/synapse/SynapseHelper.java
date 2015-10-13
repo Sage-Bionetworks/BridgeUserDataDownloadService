@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
+import com.jcabi.aspects.RetryOnFailure;
 import org.sagebionetworks.client.SynapseClient;
 import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.client.exceptions.SynapseResultNotReadyException;
@@ -38,7 +40,7 @@ public class SynapseHelper {
 
     /** Bridge config. This is used to get poll intervals and retry timeouts. */
     @Autowired
-    public void setConfig(Config config) {
+    public final void setConfig(Config config) {
         pollIntervalMillis = config.getInt(CONFIG_KEY_POLL_INTERVAL_MILLIS);
         pollMaxTries = config.getInt(CONFIG_KEY_POLL_MAX_TRIES);
     }
@@ -61,6 +63,8 @@ public class SynapseHelper {
      * @throws SynapseException
      *         if calling Synapse fails
      */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
     public void downloadFileHandle(String fileHandleId, File targetFile) throws SynapseException {
         synapseClient.downloadFromFileHandleTemporaryUrl(fileHandleId, targetFile);
     }
@@ -96,10 +100,29 @@ public class SynapseHelper {
         request.setRequestedFiles(fhaList);
 
         // Kick off async call.
-        String asyncJobToken = synapseClient.startBulkFileDownload(request);
+        String asyncJobToken = startBulkFileDownload(request);
 
         // Poll Synapse until results are ready.
-        return pollAsync(() -> synapseClient.getBulkFileDownloadResults(asyncJobToken));
+        return pollAsync(() -> getBulkFileDownloadResults(asyncJobToken));
+    }
+
+    /** Wrapper around SynapseClient.startBulkFileDownload to enable retries. */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
+    private String startBulkFileDownload(BulkFileDownloadRequest request) throws SynapseException {
+        return synapseClient.startBulkFileDownload(request);
+    }
+
+    /** Wrapper around SynapseClient.startBulkFileDownload to enable retries. */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
+    private BulkFileDownloadResponse getBulkFileDownloadResults(String asyncJobToken) throws SynapseException {
+        try {
+            return synapseClient.getBulkFileDownloadResults(asyncJobToken);
+        } catch (SynapseResultNotReadyException ex) {
+            // catch this and return null so we don't retry on "not ready"
+            return null;
+        }
     }
 
     /**
@@ -118,13 +141,32 @@ public class SynapseHelper {
     public String generateFileHandleFromTableQuery(String query, String synapseTableId) throws AsyncTimeoutException,
             SynapseException {
         // Kick off async call.
-        String asyncJobToken = synapseClient.downloadCsvFromTableAsyncStart(query, /*writeHeader*/true,
-                    /*includeRowIdAndRowVersion*/false, /*csvDescriptor*/null, synapseTableId);
+        String asyncJobToken = downloadCsvFromTableAsyncStart(query, synapseTableId);
 
         // Poll Synapse until results are ready.
-        DownloadFromTableResult result = pollAsync(() ->
-                synapseClient.downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId));
+        DownloadFromTableResult result = pollAsync(() -> downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId));
         return result.getResultsFileHandleId();
+    }
+
+    /** Wrapper around SynapseClient.downloadCsvFromTableAsyncStart to enable retries. */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
+    private String downloadCsvFromTableAsyncStart(String query, String synapseTableId) throws SynapseException {
+        return synapseClient.downloadCsvFromTableAsyncStart(query, /*writeHeader*/true,
+                    /*includeRowIdAndRowVersion*/false, /*csvDescriptor*/null, synapseTableId);
+    }
+
+    /** Wrapper around SynapseClient.downloadCsvFromTableAsyncGet to enable retries. */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
+    private DownloadFromTableResult downloadCsvFromTableAsyncGet(String asyncJobToken, String synapseTableId)
+            throws SynapseException {
+        try {
+            return synapseClient.downloadCsvFromTableAsyncGet(asyncJobToken, synapseTableId);
+        } catch (SynapseResultNotReadyException ex) {
+            // catch this and return null so we don't retry on "not ready"
+            return null;
+        }
     }
 
     /**
@@ -137,6 +179,8 @@ public class SynapseHelper {
      * @throws SynapseException
      *         if the Synapse call fails
      */
+    @RetryOnFailure(attempts = 5, delay = 100, unit = TimeUnit.MILLISECONDS, types = SynapseException.class,
+            randomize = false)
     public TableEntity getTable(String tableId) throws SynapseException {
         return synapseClient.getEntity(tableId, TableEntity.class);
     }
@@ -165,11 +209,10 @@ public class SynapseHelper {
                 }
             }
 
-            try {
-                result = callable.call();
+            result = callable.call();
+            if (result != null) {
+                // If this returns, we have a result, we can break out of our poll loop.
                 break;
-            } catch (SynapseResultNotReadyException ex) {
-                // Result not ready. Spin around one more time.
             }
         }
         if (result == null) {

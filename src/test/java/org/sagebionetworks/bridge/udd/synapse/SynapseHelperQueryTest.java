@@ -111,6 +111,7 @@ public class SynapseHelperQueryTest {
         }
         assertNotNull(thrownEx);
 
-        verify(mockClient, times(1)).downloadCsvFromTableAsyncGet(anyString(), anyString());
+        // Because of retries, we call this 5 times.
+        verify(mockClient, times(5)).downloadCsvFromTableAsyncGet(anyString(), anyString());
     }
 }

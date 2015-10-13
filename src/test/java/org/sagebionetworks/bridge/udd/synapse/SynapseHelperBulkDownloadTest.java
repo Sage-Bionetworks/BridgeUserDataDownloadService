@@ -122,7 +122,8 @@ public class SynapseHelperBulkDownloadTest {
         }
         assertNotNull(thrownEx);
 
-        verify(mockClient, times(1)).getBulkFileDownloadResults(anyString());
+        // Because of retries, we call this 5 times.
+        verify(mockClient, times(5)).getBulkFileDownloadResults(anyString());
         postValidation();
     }
 
