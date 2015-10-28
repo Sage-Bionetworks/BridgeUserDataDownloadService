@@ -9,8 +9,8 @@ import java.io.File;
 import org.joda.time.LocalDate;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
+import org.sagebionetworks.bridge.schema.UploadSchema;
+import org.sagebionetworks.bridge.schema.UploadSchemaKey;
 
 public class SynapseDownloadFromTableParametersTest {
     private static final File DUMMY_FILE = mock(File.class);

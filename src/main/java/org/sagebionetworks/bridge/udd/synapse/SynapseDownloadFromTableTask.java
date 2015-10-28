@@ -21,10 +21,10 @@ import org.sagebionetworks.util.csv.CsvNullReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
+import org.sagebionetworks.bridge.file.FileHelper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTaskExecutionException;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTimeoutException;
-import org.sagebionetworks.bridge.udd.helper.FileHelper;
 
 /**
  * A one-shot asynchronous task to query a Synapse table and download the CSV. This task returns the struct of files

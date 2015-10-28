@@ -10,7 +10,7 @@ import com.google.common.collect.ImmutableList;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
+import org.sagebionetworks.bridge.file.InMemoryFileHelper;
 
 // Deep tests for SynapsePackager.cleanupFiles()
 public class SynapsePackagerCleanupTest {

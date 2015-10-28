@@ -40,12 +40,12 @@ import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.config.Config;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
+import org.sagebionetworks.bridge.file.InMemoryFileHelper;
+import org.sagebionetworks.bridge.s3.S3Helper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.udd.helper.ZipHelper;
 import org.sagebionetworks.bridge.udd.helper.ZipHelperTest;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
-import org.sagebionetworks.bridge.udd.s3.S3Helper;
 import org.sagebionetworks.bridge.udd.worker.BridgeUddRequest;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })

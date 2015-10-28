@@ -33,10 +33,10 @@ import org.sagebionetworks.repo.model.file.FileDownloadSummary;
 import org.sagebionetworks.util.csv.CsvNullReader;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
+import org.sagebionetworks.bridge.file.InMemoryFileHelper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
+import org.sagebionetworks.bridge.schema.UploadSchemaKey;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTaskExecutionException;
-import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public class SynapseDownloadFromTableTaskTest {

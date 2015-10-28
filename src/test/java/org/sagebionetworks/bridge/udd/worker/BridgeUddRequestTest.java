@@ -7,7 +7,7 @@ import java.util.Map;
 import org.joda.time.LocalDate;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
+import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 
 @SuppressWarnings("unchecked")
 public class BridgeUddRequestTest {
@@ -86,17 +86,17 @@ public class BridgeUddRequestTest {
                 "}";
 
         // convert to POJO
-        BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(jsonText, BridgeUddRequest.class);
+        BridgeUddRequest request = DefaultObjectMapper.INSTANCE.readValue(jsonText, BridgeUddRequest.class);
         assertEquals(request.getStudyId(), "json-study");
         assertEquals(request.getUsername(), "json-user");
         assertEquals(request.getStartDate().toString(), "2015-08-03");
         assertEquals(request.getEndDate().toString(), "2015-08-07");
 
         // convert back to JSON
-        String convertedJson = BridgeUddUtil.JSON_OBJECT_MAPPER.writeValueAsString(request);
+        String convertedJson =DefaultObjectMapper.INSTANCE.writeValueAsString(request);
 
         // then convert to a map so we can validate the raw JSON
-        Map<String, String> jsonMap = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(convertedJson, Map.class);
+        Map<String, String> jsonMap = DefaultObjectMapper.INSTANCE.readValue(convertedJson, Map.class);
         assertEquals(4, jsonMap.size());
         assertEquals(jsonMap.get("studyId"), "json-study");
         assertEquals(jsonMap.get("username"), "json-user");

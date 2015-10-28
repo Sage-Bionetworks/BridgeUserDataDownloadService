@@ -21,7 +21,7 @@ import org.sagebionetworks.repo.model.table.TableEntity;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
+import org.sagebionetworks.bridge.file.InMemoryFileHelper;
 
 public class SynapseDownloadSurveyTaskTest {
     private static final String TEST_FILE_HANDLE = "test-file-handle";

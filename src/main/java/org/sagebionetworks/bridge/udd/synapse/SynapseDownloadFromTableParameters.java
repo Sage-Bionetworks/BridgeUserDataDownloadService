@@ -5,7 +5,7 @@ import java.io.File;
 import com.google.common.base.Strings;
 import org.joda.time.LocalDate;
 
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
+import org.sagebionetworks.bridge.schema.UploadSchema;
 
 /** Necessary args for downloading user data (query result CSV and attached file handles) from a Synapse table. */
 public class SynapseDownloadFromTableParameters {

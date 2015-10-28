@@ -13,6 +13,8 @@ import com.google.common.io.ByteStreams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.sagebionetworks.bridge.file.FileHelper;
+
 /** This helper zips the given input files into the given target file. */
 @Component
 public class ZipHelper {
