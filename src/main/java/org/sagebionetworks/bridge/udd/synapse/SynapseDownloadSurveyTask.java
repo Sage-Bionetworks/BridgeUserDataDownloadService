@@ -10,8 +10,8 @@ import org.sagebionetworks.repo.model.table.TableEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.sagebionetworks.bridge.file.FileHelper;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTimeoutException;
-import org.sagebionetworks.bridge.udd.helper.FileHelper;
 
 /**
  * This one-shot asynchronous task downloads a survey metadata table from Synapse. The survey metadata is downloaded in

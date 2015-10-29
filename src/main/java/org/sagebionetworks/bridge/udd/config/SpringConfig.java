@@ -28,7 +28,10 @@ import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
-import org.sagebionetworks.bridge.udd.s3.S3Helper;
+import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
+import org.sagebionetworks.bridge.file.FileHelper;
+import org.sagebionetworks.bridge.s3.S3Helper;
+import org.sagebionetworks.bridge.sqs.SqsHelper;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
 // For EC2 instances, this happens transparently.
@@ -58,6 +61,11 @@ public class SpringConfig {
     @Bean(name = "ddbHealthIdTable")
     public Table ddbHealthIdTable() {
         return ddbClient().getTable(ddbPrefix() + "HealthId");
+    }
+
+    @Bean
+    public DynamoQueryHelper ddbQueryHelper() {
+        return new DynamoQueryHelper();
     }
 
     @Bean(name = "ddbStudyTable")
@@ -108,6 +116,11 @@ public class SpringConfig {
         }
     }
 
+    @Bean
+    public FileHelper fileHelper() {
+        return new FileHelper();
+    }
+
     @Bean(name = "healthCodeEncryptor")
     public Encryptor healthCodeEncryptor() throws IOException {
         // TODO: BridgePF supports multiple versions of this. However, this will require a code change anyway. We need
@@ -117,14 +130,9 @@ public class SpringConfig {
     }
 
     @Bean
-    public AmazonS3Client s3Client() {
-        return new AmazonS3Client();
-    }
-
-    @Bean
     public S3Helper s3Helper() {
         S3Helper s3Helper = new S3Helper();
-        s3Helper.setS3Client(s3Client());
+        s3Helper.setS3Client(new AmazonS3Client());
         return s3Helper;
     }
 
@@ -143,8 +151,10 @@ public class SpringConfig {
     }
 
     @Bean
-    public AmazonSQSClient sqsClient() {
-        return new AmazonSQSClient();
+    public SqsHelper sqsHelper() {
+        SqsHelper sqsHelper = new SqsHelper();
+        sqsHelper.setSqsClient(new AmazonSQSClient());
+        return sqsHelper;
     }
 
     @Bean

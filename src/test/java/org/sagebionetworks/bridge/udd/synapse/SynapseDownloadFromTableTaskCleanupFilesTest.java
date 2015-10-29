@@ -9,9 +9,9 @@ import org.joda.time.LocalDate;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchemaKey;
-import org.sagebionetworks.bridge.udd.helper.InMemoryFileHelper;
+import org.sagebionetworks.bridge.file.InMemoryFileHelper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
+import org.sagebionetworks.bridge.schema.UploadSchemaKey;
 
 // Deep tests for SynapseDownloadFromTableTask.cleanupFiles()
 public class SynapseDownloadFromTableTaskCleanupFilesTest {

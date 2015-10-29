@@ -14,16 +14,16 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.json.DefaultObjectMapper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
+import org.sagebionetworks.bridge.sqs.SqsHelper;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
-import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
-import org.sagebionetworks.bridge.udd.util.BridgeUddUtil;
 
 /**
  * Worker that loops and polls SQS for requests and processes those requests. This is prototype scoped so we can create
@@ -35,6 +35,7 @@ public class BridgeUddWorker implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(BridgeUddWorker.class);
 
     // package-scoped for unit tests
+    static final String CONFIG_KEY_SQS_QUEUE_URL = "sqs.queue.url";
     static final String CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS = "worker.sleep.time.millis";
 
     private DynamoHelper dynamoHelper;
@@ -86,6 +87,7 @@ public class BridgeUddWorker implements Runnable {
     /** Main worker loop. */
     @Override
     public void run() {
+        String sqsQueueUrl = environmentConfig.get(CONFIG_KEY_SQS_QUEUE_URL);
         int sleepTimeMillis = environmentConfig.getInt(CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS);
 
         while (shouldKeepRunning()) {
@@ -103,13 +105,13 @@ public class BridgeUddWorker implements Runnable {
 
             try {
                 // get request from SQS
-                Message sqsMessage = sqsHelper.poll();
+                Message sqsMessage = sqsHelper.poll(sqsQueueUrl);
                 if (sqsMessage == null) {
                     // No messages yet. Loop around again.
                     continue;
                 }
                 String sqsMessageText = sqsMessage.getBody();
-                BridgeUddRequest request = BridgeUddUtil.JSON_OBJECT_MAPPER.readValue(sqsMessageText,
+                BridgeUddRequest request = DefaultObjectMapper.INSTANCE.readValue(sqsMessageText,
                         BridgeUddRequest.class);
 
                 String username = request.getUsername();
@@ -141,7 +143,7 @@ public class BridgeUddWorker implements Runnable {
                     }
 
                     // We're done processing the SQS message. Delete it so it doesn't get duped.
-                    sqsHelper.deleteMessage(sqsMessage.getReceiptHandle());
+                    sqsHelper.deleteMessage(sqsQueueUrl, sqsMessage.getReceiptHandle());
                 } finally {
                     LOG.info("Request took " + requestStopwatch.elapsed(TimeUnit.SECONDS) +
                             " seconds for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +

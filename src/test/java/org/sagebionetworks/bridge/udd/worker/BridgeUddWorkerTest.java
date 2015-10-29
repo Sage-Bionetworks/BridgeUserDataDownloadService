@@ -19,13 +19,13 @@ import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.schema.UploadSchema;
+import org.sagebionetworks.bridge.sqs.SqsHelper;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
-import org.sagebionetworks.bridge.udd.dynamodb.UploadSchema;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
-import org.sagebionetworks.bridge.udd.helper.SqsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
@@ -50,6 +50,7 @@ public class BridgeUddWorkerTest {
 
         // mock env config - set sleep time to zero so we don't needlessly sleep in unit tests
         Config mockEnvConfig = mock(Config.class);
+        when(mockEnvConfig.get(BridgeUddWorker.CONFIG_KEY_SQS_QUEUE_URL)).thenReturn("dummy-sqs-queue-url");
         when(mockEnvConfig.getInt(BridgeUddWorker.CONFIG_KEY_WORKER_SLEEP_TIME_MILLIS)).thenReturn(0);
 
         // mock SQS helper - first message null; second and third messages have data
@@ -70,7 +71,7 @@ public class BridgeUddWorkerTest {
         Message sqsMsg3 = new Message().withBody(sqsMsgBody3).withReceiptHandle("receipt-handle-3");
 
         SqsHelper mockSqsHelper = mock(SqsHelper.class);
-        when(mockSqsHelper.poll()).thenReturn(null, sqsMsg2, sqsMsg3);
+        when(mockSqsHelper.poll("dummy-sqs-queue-url")).thenReturn(null, sqsMsg2, sqsMsg3);
 
         // mock dynamo helper
         DynamoHelper mockDynamoHelper = mock(DynamoHelper.class);
@@ -126,7 +127,7 @@ public class BridgeUddWorkerTest {
                 same(accountInfo));
 
         // verify we deleted the messages
-        verify(mockSqsHelper).deleteMessage("receipt-handle-2");
-        verify(mockSqsHelper).deleteMessage("receipt-handle-3");
+        verify(mockSqsHelper).deleteMessage("dummy-sqs-queue-url", "receipt-handle-2");
+        verify(mockSqsHelper).deleteMessage("dummy-sqs-queue-url", "receipt-handle-3");
     }
 }

@@ -10,12 +10,15 @@ import javax.annotation.Resource;
 
 import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
-import com.amazonaws.services.dynamodbv2.document.RangeKeyCondition;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
 
 /** Helper class to wrap some Dynamo DB queries we make. */
 @Component
@@ -26,6 +29,7 @@ public class DynamoHelper {
     private Table ddbSynapseSurveyTablesTable;
     private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
+    private DynamoQueryHelper queryHelper;
 
     /** Health ID table. */
     @Resource(name = "ddbHealthIdTable")
@@ -43,6 +47,12 @@ public class DynamoHelper {
     @Resource(name = "ddbSynapseMapTable")
     public final void setDdbSynapseMapTable(Table ddbSynapseMapTable) {
         this.ddbSynapseMapTable = ddbSynapseMapTable;
+    }
+
+    // TODO doc
+    @Autowired
+    public final void setQueryHelper(DynamoQueryHelper queryHelper) {
+        this.queryHelper = queryHelper;
     }
 
     /**
@@ -130,7 +140,7 @@ public class DynamoHelper {
     public Map<String, UploadSchema> getSynapseTableIdsForStudy(String studyId) throws IOException {
         // query and iterate
         List<UploadSchema> schemaList = new ArrayList<>();
-        Iterable<Item> schemaItemIter = queryHelper(ddbUploadSchemaStudyIndex, "studyId", studyId, null);
+        Iterable<Item> schemaItemIter = queryHelper.query(ddbUploadSchemaStudyIndex, "studyId", studyId);
         for (Item oneSchemaItem : schemaItemIter) {
             // Index only contains study ID, key, and revision. Re-query the table to get all fields.
             String key = oneSchemaItem.getString("key");
@@ -175,24 +185,5 @@ public class DynamoHelper {
         }
 
         return synapseToSchemaMap;
-    }
-
-    /**
-     * <p>
-     * This abstracts away the call to Index.query(), which returns an ItemCollection. While ItemCollection implements
-     * Iterable, it overrides iterator() to return an IteratorSupport, which is not publicly exposed. This makes
-     * Index.query() nearly impossible to mock. So we abstract it away into a method that we can mock.
-     * </p>
-     * <p>
-     * rangeKeyCondition is optional. If not specified, this will only run the query on the hash index.
-     * </p>
-     */
-    protected Iterable<Item> queryHelper(Index index, String indexKeyName, Object indexKeyValue,
-            RangeKeyCondition rangeKeyCondition) {
-        if (rangeKeyCondition != null) {
-            return index.query(indexKeyName, indexKeyValue, rangeKeyCondition);
-        } else {
-            return index.query(indexKeyName, indexKeyValue);
-        }
     }
 }

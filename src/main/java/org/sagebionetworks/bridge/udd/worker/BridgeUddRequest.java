@@ -6,7 +6,7 @@ import com.fasterxml.jackson.datatype.joda.deser.LocalDateDeserializer;
 import com.google.common.base.Strings;
 import org.joda.time.LocalDate;
 
-import org.sagebionetworks.bridge.udd.helper.LocalDateToStringSerializer;
+import org.sagebionetworks.bridge.json.LocalDateToStringSerializer;
 
 /** Represents a request to the Bridge User Data Download Service. */
 @JsonDeserialize(builder = BridgeUddRequest.Builder.class)

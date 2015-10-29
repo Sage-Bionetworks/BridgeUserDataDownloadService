@@ -20,6 +20,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
 import org.testng.annotations.Test;
 
+import org.sagebionetworks.bridge.file.FileHelper;
+
 public class ZipHelperTest {
     @Test
     public void testZip() throws Exception {

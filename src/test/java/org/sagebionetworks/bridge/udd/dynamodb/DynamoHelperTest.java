@@ -1,8 +1,6 @@
 package org.sagebionetworks.bridge.udd.dynamodb;
 
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -16,6 +14,9 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Item;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import org.testng.annotations.Test;
+
+import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
+import org.sagebionetworks.bridge.schema.UploadSchema;
 
 public class DynamoHelperTest {
     private static final String DUMMY_FIELD_DEF_LIST_JSON = "[\n" +
@@ -117,7 +118,7 @@ public class DynamoHelperTest {
         // * bar schema has a table
         // * qwerty and asdf schemas both point to the same table
 
-        DynamoHelper dynamoHelper = spy(new DynamoHelper());
+        DynamoHelper dynamoHelper = new DynamoHelper();
 
         // Mock Schema table Study index. This involves stubbing out queryHelper() because indices can't be mocked
         // directly.
@@ -128,9 +129,11 @@ public class DynamoHelperTest {
         mockSchemaStudyIndexResult.add(makeUploadSchemaDdbItem("test-study", "asdf", 4, null));
 
         Index mockSchemaStudyIndex = mock(Index.class);
-        doReturn(mockSchemaStudyIndexResult).when(dynamoHelper).queryHelper(mockSchemaStudyIndex, "studyId",
-                "test-study", null);
+        DynamoQueryHelper mockQueryHelper = mock(DynamoQueryHelper.class);
+        when(mockQueryHelper.query(mockSchemaStudyIndex, "studyId", "test-study"))
+                .thenReturn(mockSchemaStudyIndexResult);
         dynamoHelper.setDdbUploadSchemaStudyIndex(mockSchemaStudyIndex);
+        dynamoHelper.setQueryHelper(mockQueryHelper);
 
         // mock schema table
         Table mockSchemaTable = mock(Table.class);
