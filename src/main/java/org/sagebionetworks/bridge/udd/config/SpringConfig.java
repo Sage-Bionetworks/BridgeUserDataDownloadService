@@ -30,6 +30,7 @@ import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
 import org.sagebionetworks.bridge.file.FileHelper;
+import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
 import org.sagebionetworks.bridge.s3.S3Helper;
 import org.sagebionetworks.bridge.sqs.SqsHelper;
 
@@ -127,6 +128,13 @@ public class SpringConfig {
         // to refactor these into a shared library anyway, so for the initial investment, do something quick and dirty
         // until we have the resources to do the refactor properly.
         return new AesGcmEncryptor(environmentConfig().get("health.code.key"));
+    }
+
+    @Bean
+    public HeartbeatLogger heartbeatLogger() {
+        HeartbeatLogger heartbeatLogger = new HeartbeatLogger();
+        heartbeatLogger.setIntervalMinutes(environmentConfig().getInt("heartbeat.interval.minutes"));
+        return heartbeatLogger;
     }
 
     @Bean
