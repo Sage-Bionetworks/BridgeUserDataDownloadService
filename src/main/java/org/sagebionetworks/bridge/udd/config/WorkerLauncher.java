@@ -4,11 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
-import org.sagebionetworks.bridge.udd.worker.BridgeUddWorker;
+import org.sagebionetworks.bridge.sqs.PollSqsWorker;
 
 /**
  * Launches worker threads. This hooks into the Spring Boot command-line runner, which is really just a big
@@ -19,17 +18,16 @@ public class WorkerLauncher implements CommandLineRunner {
     private static final Logger LOG = LoggerFactory.getLogger(WorkerLauncher.class);
 
     private HeartbeatLogger heartbeatLogger;
-    private ApplicationContext springCtx;
+    private PollSqsWorker sqsWorker;
 
     @Autowired
     public final void setHeartbeatLogger(HeartbeatLogger heartbeatLogger) {
         this.heartbeatLogger = heartbeatLogger;
     }
 
-    /** Spring context. */
     @Autowired
-    public final void setSpringContext(ApplicationContext springCtx) {
-        this.springCtx = springCtx;
+    public final void setSqsWorker(PollSqsWorker sqsWorker) {
+        this.sqsWorker = sqsWorker;
     }
 
     /**
@@ -44,10 +42,6 @@ public class WorkerLauncher implements CommandLineRunner {
         new Thread(heartbeatLogger).start();
 
         LOG.info("Launching workers...");
-        // We use getBean() instead of autowiring because this is a prototype bean, so we actually actually want to
-        // get multiple copies of this bean for our executor.
-        // TODO implement executor and multithreading
-        BridgeUddWorker worker = springCtx.getBean(BridgeUddWorker.class);
-        new Thread(worker).start();
+        new Thread(sqsWorker).start();
     }
 }

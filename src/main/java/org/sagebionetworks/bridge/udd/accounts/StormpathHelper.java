@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.crypto.Encryptor;
+import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 
 /** Helper class to get account info from Stormpath. */
@@ -40,11 +41,19 @@ public class StormpathHelper {
      *         username of the account to fetch, must be non-null
      * @return the requested account, will be non-null
      */
-    public AccountInfo getAccount(StudyInfo studyInfo, String username) {
+    public AccountInfo getAccount(StudyInfo studyInfo, String username) throws PollSqsWorkerBadRequestException {
         // get account from Stormpath
         Directory directory = stormpathClient.getResource(studyInfo.getStormpathHref(), Directory.class);
         AccountList accountList = directory.getAccounts(Accounts.where(Accounts.username().eqIgnoreCase(username))
                 .withCustomData());
+
+        int numAccounts = accountList.getSize();
+        if (numAccounts == 0) {
+            throw new PollSqsWorkerBadRequestException("No accounts found for hash[username]=" + username.hashCode());
+        } else if (numAccounts > 1) {
+            throw new PollSqsWorkerBadRequestException("Multiple accounts found for hash[username]=" +
+                    username.hashCode());
+        }
         Account account = accountList.single();
 
         // Decrypt health ID. It's called "code" in Stormpath, but it's actually the Health ID.

@@ -20,6 +20,7 @@ import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
 import org.sagebionetworks.client.SynapseAdminClientImpl;
 import org.sagebionetworks.client.SynapseClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -32,7 +33,9 @@ import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
 import org.sagebionetworks.bridge.file.FileHelper;
 import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
 import org.sagebionetworks.bridge.s3.S3Helper;
+import org.sagebionetworks.bridge.sqs.PollSqsWorker;
 import org.sagebionetworks.bridge.sqs.SqsHelper;
+import org.sagebionetworks.bridge.udd.worker.BridgeUddSqsCallback;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
 // For EC2 instances, this happens transparently.
@@ -163,6 +166,19 @@ public class SpringConfig {
         SqsHelper sqsHelper = new SqsHelper();
         sqsHelper.setSqsClient(new AmazonSQSClient());
         return sqsHelper;
+    }
+
+    @Bean
+    @Autowired
+    public PollSqsWorker sqsWorker(BridgeUddSqsCallback callback) {
+        Config config = environmentConfig();
+
+        PollSqsWorker sqsWorker = new PollSqsWorker();
+        sqsWorker.setCallback(callback);
+        sqsWorker.setQueueUrl(config.get("sqs.queue.url"));
+        sqsWorker.setSleepTimeMillis(config.getInt("worker.sleep.time.millis"));
+        sqsWorker.setSqsHelper(sqsHelper());
+        return sqsWorker;
     }
 
     @Bean
