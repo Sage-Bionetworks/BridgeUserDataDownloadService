@@ -168,18 +168,18 @@ public class SpringConfig {
         return sqsHelper;
     }
 
-    @Bean
-    @Autowired
-    public PollSqsWorker sqsWorker(BridgeUddSqsCallback callback) {
-        Config config = environmentConfig();
-
-        PollSqsWorker sqsWorker = new PollSqsWorker();
-        sqsWorker.setCallback(callback);
-        sqsWorker.setQueueUrl(config.get("sqs.queue.url"));
-        sqsWorker.setSleepTimeMillis(config.getInt("worker.sleep.time.millis"));
-        sqsWorker.setSqsHelper(sqsHelper());
-        return sqsWorker;
-    }
+//    @Bean
+//    @Autowired
+//    public PollSqsWorker sqsWorker(BridgeUddSqsCallback callback) {
+//        Config config = environmentConfig();
+//
+//        PollSqsWorker sqsWorker = new PollSqsWorker();
+//        sqsWorker.setCallback(callback);
+//        sqsWorker.setQueueUrl(config.get("sqs.queue.url"));
+//        sqsWorker.setSleepTimeMillis(config.getInt("worker.sleep.time.millis"));
+//        sqsWorker.setSqsHelper(sqsHelper());
+//        return sqsWorker;
+//    }
 
     @Bean
     public SynapseClient synapseClient() {

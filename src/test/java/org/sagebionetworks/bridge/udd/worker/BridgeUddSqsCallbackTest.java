@@ -8,11 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -27,6 +30,9 @@ import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
 public class BridgeUddSqsCallbackTest {
+    public BridgeUddSqsCallbackTest() throws IOException {
+    }
+
     // mock objects - These are used only as passthroughs between the sub-components. So just create mocks instead
     // of instantiating all the fields.
     private static final StudyInfo MOCK_STUDY_INFO = mock(StudyInfo.class);
@@ -51,6 +57,19 @@ public class BridgeUddSqsCallbackTest {
             "   \"startDate\":\"2015-03-09\",\n" +
             "   \"endDate\":\"2015-03-31\"\n" +
             "}";
+
+    private final JsonNode REQUEST_JSON = DefaultObjectMapper.INSTANCE.readValue(REQUEST_JSON_TEXT, JsonNode.class);
+
+    private static final String Invalid_JSON_TEXT = "{\n" +
+            "   \"invalidType\":\"" + STUDY_ID +"\",\n" +
+            "   \"username\":\"" + EMAIL + "\",\n" +
+            "   \"startDate\":\"2015-03-09\",\n" +
+            "   \"endDate\":\"2015-03-31\"\n" +
+            "}";
+
+    private final JsonNode INVALID_REQUEST_JSON = DefaultObjectMapper.INSTANCE.readValue(Invalid_JSON_TEXT, JsonNode.class);
+
+
 
     // test members
     private BridgeUddSqsCallback callback;
@@ -91,7 +110,7 @@ public class BridgeUddSqsCallbackTest {
                 any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(null);
 
         // execute
-        callback.callback(REQUEST_JSON_TEXT);
+        callback.callback(REQUEST_JSON);
 
         // verify SesHelper calls
         verify(mockSesHelper).sendNoDataMessageToAccount(same(MOCK_STUDY_INFO), same(ACCOUNT_INFO));
@@ -105,7 +124,7 @@ public class BridgeUddSqsCallbackTest {
                 any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(MOCK_PRESIGNED_URL_INFO);
 
         // execute
-        callback.callback(REQUEST_JSON_TEXT);
+        callback.callback(REQUEST_JSON);
 
         // verify SesHelper calls
         verify(mockSesHelper).sendPresignedUrlToAccount(same(MOCK_STUDY_INFO), same(MOCK_PRESIGNED_URL_INFO),
@@ -115,6 +134,6 @@ public class BridgeUddSqsCallbackTest {
 
     @Test(expectedExceptions = PollSqsWorkerBadRequestException.class)
     public void malformedRequest() throws Exception {
-        callback.callback("not json");
+        callback.callback(INVALID_REQUEST_JSON);
     }
 }

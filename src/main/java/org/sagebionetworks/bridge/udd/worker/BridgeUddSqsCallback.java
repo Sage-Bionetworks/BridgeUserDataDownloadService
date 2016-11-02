@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
 /** SQS callback. Called by the PollSqsWorker. This handles a UDD request. */
 @Component
-public class BridgeUddSqsCallback implements PollSqsCallback {
+public class BridgeUddSqsCallback {
     private static final Logger LOG = LoggerFactory.getLogger(BridgeUddSqsCallback.class);
 
     private DynamoHelper dynamoHelper;
@@ -57,11 +58,10 @@ public class BridgeUddSqsCallback implements PollSqsCallback {
         this.synapsePackager = synapsePackager;
     }
 
-    @Override
-    public void callback(String sqsMessageText) throws IOException, PollSqsWorkerBadRequestException {
+    public void callback(JsonNode body) throws IOException, PollSqsWorkerBadRequestException {
         BridgeUddRequest request;
         try {
-            request = DefaultObjectMapper.INSTANCE.readValue(sqsMessageText, BridgeUddRequest.class);
+            request = DefaultObjectMapper.INSTANCE.treeToValue(body, BridgeUddRequest.class);
         } catch (IOException ex) {
             throw new PollSqsWorkerBadRequestException("Error parsing request: " + ex.getMessage(), ex);
         }
