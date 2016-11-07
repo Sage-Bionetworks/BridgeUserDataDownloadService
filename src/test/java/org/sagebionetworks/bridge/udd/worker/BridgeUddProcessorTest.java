@@ -29,8 +29,8 @@ import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
-public class BridgeUddSqsCallbackTest {
-    public BridgeUddSqsCallbackTest() throws IOException {
+public class BridgeUddProcessorTest {
+    public BridgeUddProcessorTest() throws IOException {
     }
 
     // mock objects - These are used only as passthroughs between the sub-components. So just create mocks instead
@@ -72,7 +72,7 @@ public class BridgeUddSqsCallbackTest {
 
 
     // test members
-    private BridgeUddSqsCallback callback;
+    private BridgeUddProcessor callback;
     private SynapsePackager mockPackager;
     private SesHelper mockSesHelper;
 
@@ -96,7 +96,7 @@ public class BridgeUddSqsCallbackTest {
         mockPackager = mock(SynapsePackager.class);
 
         // set up callback
-        callback = new BridgeUddSqsCallback();
+        callback = new BridgeUddProcessor();
         callback.setDynamoHelper(mockDynamoHelper);
         callback.setSesHelper(mockSesHelper);
         callback.setStormpathHelper(mockStormpathHelper);
@@ -110,7 +110,7 @@ public class BridgeUddSqsCallbackTest {
                 any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(null);
 
         // execute
-        callback.callback(REQUEST_JSON);
+        callback.process(REQUEST_JSON);
 
         // verify SesHelper calls
         verify(mockSesHelper).sendNoDataMessageToAccount(same(MOCK_STUDY_INFO), same(ACCOUNT_INFO));
@@ -124,7 +124,7 @@ public class BridgeUddSqsCallbackTest {
                 any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(MOCK_PRESIGNED_URL_INFO);
 
         // execute
-        callback.callback(REQUEST_JSON);
+        callback.process(REQUEST_JSON);
 
         // verify SesHelper calls
         verify(mockSesHelper).sendPresignedUrlToAccount(same(MOCK_STUDY_INFO), same(MOCK_PRESIGNED_URL_INFO),
@@ -134,6 +134,6 @@ public class BridgeUddSqsCallbackTest {
 
     @Test(expectedExceptions = PollSqsWorkerBadRequestException.class)
     public void malformedRequest() throws Exception {
-        callback.callback(INVALID_REQUEST_JSON);
+        callback.process(INVALID_REQUEST_JSON);
     }
 }

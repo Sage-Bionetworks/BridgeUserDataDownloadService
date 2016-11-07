@@ -26,7 +26,7 @@ import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.udd.exceptions.AsyncTimeoutException;
 
 /** Helper class to Synapse, which wraps Synapse async call patterns.. */
-@Component
+@Component("uddSynapseHelper")
 public class SynapseHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SynapseHelper.class);
 

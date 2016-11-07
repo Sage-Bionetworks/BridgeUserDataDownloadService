@@ -21,7 +21,7 @@ import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
 import org.sagebionetworks.bridge.schema.UploadSchema;
 
 /** Helper class to wrap some Dynamo DB queries we make. */
-@Component
+@Component("uddDynamoHelper")
 public class DynamoHelper {
     private Table ddbHealthIdTable;
     private Table ddbStudyTable;

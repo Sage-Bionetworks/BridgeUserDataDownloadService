@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 import org.sagebionetworks.bridge.schema.UploadSchema;
-import org.sagebionetworks.bridge.sqs.PollSqsCallback;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
@@ -26,8 +25,8 @@ import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
 /** SQS callback. Called by the PollSqsWorker. This handles a UDD request. */
 @Component
-public class BridgeUddSqsCallback {
-    private static final Logger LOG = LoggerFactory.getLogger(BridgeUddSqsCallback.class);
+public class BridgeUddProcessor {
+    private static final Logger LOG = LoggerFactory.getLogger(BridgeUddProcessor.class);
 
     private DynamoHelper dynamoHelper;
     private SesHelper sesHelper;
@@ -58,7 +57,7 @@ public class BridgeUddSqsCallback {
         this.synapsePackager = synapsePackager;
     }
 
-    public void callback(JsonNode body) throws IOException, PollSqsWorkerBadRequestException {
+    public void process(JsonNode body) throws IOException, PollSqsWorkerBadRequestException {
         BridgeUddRequest request;
         try {
             request = DefaultObjectMapper.INSTANCE.treeToValue(body, BridgeUddRequest.class);
@@ -71,7 +70,7 @@ public class BridgeUddSqsCallback {
         String studyId = request.getStudyId();
         String startDateStr = request.getStartDate().toString();
         String endDateStr = request.getEndDate().toString();
-        LOG.info("Received request for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
+        LOG.info("Received request for hash[username]=" + username + ", study=" + studyId + ", startDate=" +
                 startDateStr + ",endDate=" + endDateStr);
 
         Stopwatch requestStopwatch = Stopwatch.createStarted();
