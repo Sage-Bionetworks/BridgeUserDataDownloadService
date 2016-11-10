@@ -38,10 +38,10 @@ public class WorkerLauncher implements CommandLineRunner {
      */
     @Override
     public void run(String... args) {
-        LOG.info("Launching heartbeat...");
+        LOG.info("UDD Launching heartbeat...");
         new Thread(heartbeatLogger).start();
 
-        LOG.info("Launching workers...");
+        LOG.info("UDD Launching workers...");
         new Thread(sqsWorker).start();
     }
 }
