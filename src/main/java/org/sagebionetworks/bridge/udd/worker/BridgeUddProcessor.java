@@ -70,7 +70,7 @@ public class BridgeUddProcessor {
         String studyId = request.getStudyId();
         String startDateStr = request.getStartDate().toString();
         String endDateStr = request.getEndDate().toString();
-        LOG.info("Received request for hash[username]=" + username + ", study=" + studyId + ", startDate=" +
+        LOG.info("Received request for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
                 startDateStr + ",endDate=" + endDateStr);
 
         Stopwatch requestStopwatch = Stopwatch.createStarted();

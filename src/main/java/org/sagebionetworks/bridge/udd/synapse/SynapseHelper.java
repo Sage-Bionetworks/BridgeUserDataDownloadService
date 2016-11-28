@@ -20,6 +20,7 @@ import org.sagebionetworks.repo.model.table.TableEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.config.Config;
@@ -40,6 +41,7 @@ public class SynapseHelper {
 
     /** Bridge config. This is used to get poll intervals and retry timeouts. */
     @Autowired
+    @Qualifier("uddConfigProperties")
     public final void setConfig(Config config) {
         pollIntervalMillis = config.getInt(CONFIG_KEY_POLL_INTERVAL_MILLIS);
         pollMaxTries = config.getInt(CONFIG_KEY_POLL_MAX_TRIES);
@@ -47,6 +49,7 @@ public class SynapseHelper {
 
     /** Synapse client. */
     @Autowired
+    @Qualifier("workerPlatformSynapseClient")
     public final void setSynapseClient(SynapseClient synapseClient) {
         this.synapseClient = synapseClient;
     }

@@ -23,6 +23,7 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.config.Config;
@@ -68,6 +69,7 @@ public class SynapsePackager {
 
     /** Bridge config, used to get the S3 upload bucket and pre-signed URL expiration. */
     @Autowired
+    @Qualifier("uddConfigProperties")
     public final void setConfig(Config config) {
         urlExpirationHours = config.getInt(CONFIG_KEY_EXPIRATION_HOURS);
         userdataBucketName = config.get(CONFIG_KEY_USERDATA_BUCKET);
