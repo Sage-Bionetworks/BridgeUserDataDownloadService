@@ -13,53 +13,66 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
-import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.stormpath.sdk.api.ApiKey;
 import com.stormpath.sdk.api.ApiKeys;
 import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
+import org.sagebionetworks.bridge.config.Config;
+import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.sagebionetworks.client.SynapseAdminClientImpl;
 import org.sagebionetworks.client.SynapseClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
-import org.sagebionetworks.bridge.config.Config;
-import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
-import org.sagebionetworks.bridge.file.FileHelper;
 import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
 import org.sagebionetworks.bridge.s3.S3Helper;
-import org.sagebionetworks.bridge.sqs.PollSqsWorker;
-import org.sagebionetworks.bridge.sqs.SqsHelper;
-import org.sagebionetworks.bridge.udd.worker.BridgeUddSqsCallback;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
 // For EC2 instances, this happens transparently.
 // See http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html and
 // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-setup.html#set-up-creds for more info.
 @ComponentScan("org.sagebionetworks.bridge.udd")
-@Configuration
+@Configuration("uddConfig")
 public class SpringConfig {
+    private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
+    private static final String DEFAULT_CONFIG_FILE = CONFIG_FILE;
+    private static final String USER_CONFIG_FILE = System.getProperty("user.home") + "/" + CONFIG_FILE;
+
+    @Bean(name = "uddConfigProperties")
+    public Config bridgeConfig() {
+        Path localConfigPath = Paths.get(USER_CONFIG_FILE);
+
+        try {
+            if (Files.exists(localConfigPath)) {
+                return new PropertiesConfig(DEFAULT_CONFIG_FILE, localConfigPath);
+            } else {
+                return new PropertiesConfig(DEFAULT_CONFIG_FILE);
+            }
+        } catch (IOException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Bean(name = "uddDdbPrefix")
+    public String ddbPrefix() {
+        Config envConfig = bridgeConfig();
+        String envName = envConfig.getEnvironment().name().toLowerCase();
+        String userName = envConfig.getUser();
+        return envName + '-' + userName + '-';
+    }
+
     @Bean(name = "auxiliaryExecutorService")
     public ExecutorService auxiliaryExecutorService() {
-        return Executors.newFixedThreadPool(environmentConfig().getInt("threadpool.aux.count"));
+        return Executors.newFixedThreadPool(bridgeConfig().getInt("threadpool.aux.count"));
     }
 
     @Bean
     public DynamoDB ddbClient() {
         return new DynamoDB(new AmazonDynamoDBClient());
-    }
-
-    @Bean(name = "ddbPrefix")
-    public String ddbPrefix() {
-        Config envConfig = environmentConfig();
-        String envName = envConfig.getEnvironment().name().toLowerCase();
-        String userName = envConfig.getUser();
-        return envName + '-' + userName + '-';
     }
 
     @Bean(name = "ddbHealthIdTable")
@@ -79,7 +92,7 @@ public class SpringConfig {
 
     @Bean(name = "ddbSynapseMapTable")
     public Table ddbSynapseMapTable() {
-        return ddbClient().getTable(environmentConfig().get("synapse.map.table"));
+        return ddbClient().getTable(bridgeConfig().get("synapse.map.table"));
     }
 
     // Naming note: This is a DDB table containing references to a set of Synapse tables. The name is a bit confusing,
@@ -99,44 +112,18 @@ public class SpringConfig {
         return ddbUploadSchemaTable().getIndex("studyId-index");
     }
 
-    private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
-    private static final String DEFAULT_CONFIG_FILE = CONFIG_FILE;
-    private static final String USER_CONFIG_FILE = System.getProperty("user.home") + "/" + CONFIG_FILE;
-
-    @Bean
-    public Config environmentConfig() {
-        String defaultConfig = getClass().getClassLoader().getResource(DEFAULT_CONFIG_FILE).getPath();
-        Path defaultConfigPath = Paths.get(defaultConfig);
-        Path localConfigPath = Paths.get(USER_CONFIG_FILE);
-
-        try {
-            if (Files.exists(localConfigPath)) {
-                return new PropertiesConfig(defaultConfigPath, localConfigPath);
-            } else {
-                return new PropertiesConfig(defaultConfigPath);
-            }
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    @Bean
-    public FileHelper fileHelper() {
-        return new FileHelper();
-    }
-
     @Bean(name = "healthCodeEncryptor")
-    public Encryptor healthCodeEncryptor() throws IOException {
+    public Encryptor healthCodeEncryptor() {
         // TODO: BridgePF supports multiple versions of this. However, this will require a code change anyway. We need
         // to refactor these into a shared library anyway, so for the initial investment, do something quick and dirty
         // until we have the resources to do the refactor properly.
-        return new AesGcmEncryptor(environmentConfig().get("health.code.key"));
+        return new AesGcmEncryptor(bridgeConfig().get("health.code.key"));
     }
 
     @Bean
-    public HeartbeatLogger heartbeatLogger() {
+    public HeartbeatLogger heartbeatLogger() throws IOException {
         HeartbeatLogger heartbeatLogger = new HeartbeatLogger();
-        heartbeatLogger.setIntervalMinutes(environmentConfig().getInt("heartbeat.interval.minutes"));
+        heartbeatLogger.setIntervalMinutes(bridgeConfig().getInt("heartbeat.interval.minutes"));
         return heartbeatLogger;
     }
 
@@ -152,42 +139,10 @@ public class SpringConfig {
         return new AmazonSimpleEmailServiceClient();
     }
 
-    @Bean
+    @Bean(name="uddStompath")
     public Client stormpathClient() throws IOException {
-        Config envConfig = environmentConfig();
-
-        ApiKey apiKey = ApiKeys.builder().setId(envConfig.get("stormpath.id"))
-                .setSecret(envConfig.get("stormpath.secret")).build();
+        ApiKey apiKey = ApiKeys.builder().setId(bridgeConfig().get("stormpath.id"))
+                .setSecret(bridgeConfig().get("stormpath.secret")).build();
         return Clients.builder().setApiKey(apiKey).setBaseUrl("https://enterprise.stormpath.io/v1").build();
-    }
-
-    @Bean
-    public SqsHelper sqsHelper() {
-        SqsHelper sqsHelper = new SqsHelper();
-        sqsHelper.setSqsClient(new AmazonSQSClient());
-        return sqsHelper;
-    }
-
-    @Bean
-    @Autowired
-    public PollSqsWorker sqsWorker(BridgeUddSqsCallback callback) {
-        Config config = environmentConfig();
-
-        PollSqsWorker sqsWorker = new PollSqsWorker();
-        sqsWorker.setCallback(callback);
-        sqsWorker.setQueueUrl(config.get("sqs.queue.url"));
-        sqsWorker.setSleepTimeMillis(config.getInt("worker.sleep.time.millis"));
-        sqsWorker.setSqsHelper(sqsHelper());
-        return sqsWorker;
-    }
-
-    @Bean
-    public SynapseClient synapseClient() {
-        Config envConfig = environmentConfig();
-
-        SynapseClient synapseClient = new SynapseAdminClientImpl();
-        synapseClient.setUserName(envConfig.get("synapse.user"));
-        synapseClient.setApiKey(envConfig.get("synapse.api.key"));
-        return synapseClient;
     }
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 import org.sagebionetworks.bridge.schema.UploadSchema;
-import org.sagebionetworks.bridge.sqs.PollSqsCallback;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
@@ -25,8 +25,8 @@ import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
 /** SQS callback. Called by the PollSqsWorker. This handles a UDD request. */
 @Component
-public class BridgeUddSqsCallback implements PollSqsCallback {
-    private static final Logger LOG = LoggerFactory.getLogger(BridgeUddSqsCallback.class);
+public class BridgeUddProcessor {
+    private static final Logger LOG = LoggerFactory.getLogger(BridgeUddProcessor.class);
 
     private DynamoHelper dynamoHelper;
     private SesHelper sesHelper;
@@ -57,11 +57,10 @@ public class BridgeUddSqsCallback implements PollSqsCallback {
         this.synapsePackager = synapsePackager;
     }
 
-    @Override
-    public void callback(String sqsMessageText) throws IOException, PollSqsWorkerBadRequestException {
+    public void process(JsonNode body) throws IOException, PollSqsWorkerBadRequestException {
         BridgeUddRequest request;
         try {
-            request = DefaultObjectMapper.INSTANCE.readValue(sqsMessageText, BridgeUddRequest.class);
+            request = DefaultObjectMapper.INSTANCE.treeToValue(body, BridgeUddRequest.class);
         } catch (IOException ex) {
             throw new PollSqsWorkerBadRequestException("Error parsing request: " + ex.getMessage(), ex);
         }
