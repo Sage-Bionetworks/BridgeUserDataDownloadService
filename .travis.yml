@@ -2,19 +2,9 @@ language: java
 jdk:
 - oraclejdk8
 sudo: false
-before_deploy: mvn clean verify
-deploy:
-  skip_cleanup: true
-  provider: elasticbeanstalk
-  access_key_id:
-    secure: Zx9LfHE/faI7zLKKnT7ekms1GuCLdXkOuW+ElAvbbxxFDwH+fNi8l9jbDjNE8Edi7393ABp4eTMSkOz4dDEmWaxHLY9pd3zgt76KyNn1IwWHwGdvs9TXkUgqQgYL12PgyVbpOTtHWvAi95HDnDSECuY9lyIhfuX7VntXHH1dzNAedF7dYErVvQ9RjjuRJaAn5mj3imvXmNt5ASiFvYBHTgKBd621P2ouuz8FIEZEtDSdZubUiHvRfPm3cwnMZBtG1IKskY+zSrofjfqHGi9llGn5t0oLaSNMjrsgIFWV9HcOpj4YV++55qQ1NR0tkg2v1doymv9IusIPxUxKIAkKfxtATQ1ZRillqqg4zCsQt3pLmISs5tgjqq87bVsLREhanxzu0lr8pJQeACw26DQ662f9BYYUMVjdrAxSC9+Rn51C8kkkdb6KbmuSvTttAMgYekKAW6oN2x33vr3QIjAeQoD8jp8mj+ZG/UfT4ZFkoI/eD2oLRU7sgNyFiwazuV99Bc1BCiUvcmCEwp0Ljg+ea8NLNXzVLT7Dpg5VypmeWV2HsEOyfnW/0XVN4vxtEpCivFEJFPt8z/TIGwkG3VZ2w/Pfc1LsCR409WM23VkCdQQ05Hw7DDMSdmFeulrv2csklxto2LL5xvABWjY9YcerGpzgKHWSkDUITihCrXQHnD4=
-  secret_access_key:
-    secure: I3OjK421myPbUpt53rqFLobZWlwnc92K+vfw25qHEv+AVbCW49E72SDzFa6w5MbuHKxQoKwDfwgQAFl+tpbRfOTfEP4PYRw6VtvcF7sHI4dULmAqonxIitsxK6AbPFIBfQwUxI1V7tY66TnwGqJ1TlO2gScustK7l7rFGjuuvihOrdp6jPKv1H5bN8kondbPeKU4wsnE6oLjtj2iWTK9dZZsghIREctby3RsL/YymAG+MITS/CV+OYpXhZvphMQcD07jhabhR8un85/NYmcVoDElbgWnvq+IOGUEJ7fAkY6s2pkKhUlA9kJ2FJeS6+QsDMZwZ2p3Hy0O7wY1xovj3JIghUmDuBlpxxX+n1N9dqn2B33WWI9ysYjpheLSr/M8/j82fv+8UmAby5ZgCczpaEreNQYTYkd8WDR+/RXy5ThWJNipm3QLHxV22YqiUD1oveyY94g3MGTNjGQneRqPjnpY31+Bs3agPfUqDZaJM3crxtpGkE9wp8NGLYk0pEz49uPy5YUrQ6GgCjhFU+pjbROvgm5BJb8DzY7WzAEptHzyHCvwhKMHhBb/rEmoR8RQJGll6g2cQ6IzV8MBMjXKY1AG8FkpK4G4DM5tmfbtXjK3XjC5QyPxPnISx9r43jZ3J4xTXI/Fcux6uOC+PurNehM6VcoqK+/CHLdfJLkurcQ=
-  region: us-east-1
-  app: BridgeUserDataDownloadService
-  env:
-    develop: Bridge-UDD-Worker-Dev
-    uat: Bridge-UDD-Worker-Uat
-    prod: Bridge-UDD-Worker-Prod
-  bucket_name: elasticbeanstalk-us-east-1-649232250620
-  zip-file: target/BridgeUserDataDownloadService-1.0.war
+script: mvn clean deploy
+branches:
+  only:
+  - develop
+  - uat
+  - prod
