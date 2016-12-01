@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import au.com.bytecode.opencsv.CSVReader;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CharStreams;
@@ -30,7 +31,6 @@ import org.mockito.ArgumentCaptor;
 import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileDownloadSummary;
-import org.sagebionetworks.util.csv.CsvNullReader;
 import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.file.InMemoryFileHelper;
@@ -406,7 +406,7 @@ public class SynapseDownloadFromTableTaskTest {
     // Direct string matching means we tightly couple to the CSV writer implementation. Instead, re-parse the file as a
     // CSV and check the values are what we expect.
     private List<String[]> parseCsv(File csvFile) throws Exception {
-        try (CsvNullReader csvFileReader = new CsvNullReader(inMemoryFileHelper.getReader(csvFile))) {
+        try (CSVReader csvFileReader = new CSVReader(inMemoryFileHelper.getReader(csvFile))) {
             return csvFileReader.readAll();
         }
     }

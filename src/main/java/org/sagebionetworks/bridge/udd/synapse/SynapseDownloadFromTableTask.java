@@ -11,13 +11,13 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
+import au.com.bytecode.opencsv.CSVReader;
 import au.com.bytecode.opencsv.CSVWriter;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import org.sagebionetworks.client.exceptions.SynapseException;
 import org.sagebionetworks.repo.model.file.BulkFileDownloadResponse;
 import org.sagebionetworks.repo.model.file.FileDownloadSummary;
-import org.sagebionetworks.util.csv.CsvNullReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -186,7 +186,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
      * {@link SynapseDownloadFromTableContext#setColumnInfo}.
      */
     private void getColumnInfoFromCsv() throws AsyncTaskExecutionException {
-        try (CsvNullReader csvFileReader = new CsvNullReader(fileHelper.getReader(ctx.getCsvFile()))) {
+        try (CSVReader csvFileReader = new CSVReader(fileHelper.getReader(ctx.getCsvFile()))) {
             // Get first row, the header row. Because of our previous check, we know this row must exist.
             String[] headerRow = csvFileReader.readNext();
 
@@ -221,7 +221,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
         Set<Integer> fileHandleColIdxSet = ctx.getColumnInfo().getFileHandleColumnIndexSet();
 
         Stopwatch extractFileHandlesStopwatch = Stopwatch.createStarted();
-        try (CsvNullReader csvFileReader = new CsvNullReader(fileHelper.getReader(ctx.getCsvFile()))) {
+        try (CSVReader csvFileReader = new CSVReader(fileHelper.getReader(ctx.getCsvFile()))) {
             // Skip header row. We've already processed it.
             csvFileReader.readNext();
 
@@ -324,7 +324,7 @@ public class SynapseDownloadFromTableTask implements Callable<SynapseDownloadFro
         ctx.setEditedCsvFile(editedCsvFile);
 
         Stopwatch editCsvStopwatch = Stopwatch.createStarted();
-        try (CsvNullReader csvFileReader = new CsvNullReader(fileHelper.getReader(ctx.getCsvFile()));
+        try (CSVReader csvFileReader = new CSVReader(fileHelper.getReader(ctx.getCsvFile()));
                 CSVWriter modifiedCsvFileWriter = new CSVWriter(fileHelper.getWriter(editedCsvFile))) {
             // Copy headers.
             modifiedCsvFileWriter.writeNext(csvFileReader.readNext());
