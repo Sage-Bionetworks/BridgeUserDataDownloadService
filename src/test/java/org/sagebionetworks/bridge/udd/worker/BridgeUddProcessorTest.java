@@ -33,30 +33,30 @@ import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 public class BridgeUddProcessorTest {
     // mock objects - These are used only as passthroughs between the sub-components. So just create mocks instead
     // of instantiating all the fields.
-    private static final StudyInfo MOCK_STUDY_INFO = mock(StudyInfo.class);
-    private static final Map<String, UploadSchema> MOCK_SYNAPSE_TO_SCHEMA = ImmutableMap.of();
-    private static final Set<String> MOCK_SURVEY_TABLE_ID_SET = ImmutableSet.of();
-    private static final PresignedUrlInfo MOCK_PRESIGNED_URL_INFO = mock(PresignedUrlInfo.class);
+    public static final StudyInfo MOCK_STUDY_INFO = mock(StudyInfo.class);
+    public static final Map<String, UploadSchema> MOCK_SYNAPSE_TO_SCHEMA = ImmutableMap.of();
+    public static final Set<String> MOCK_SURVEY_TABLE_ID_SET = ImmutableSet.of();
+    public static final PresignedUrlInfo MOCK_PRESIGNED_URL_INFO = mock(PresignedUrlInfo.class);
 
     // simple strings for test
-    private static final String EMAIL = "test@example.com";
-    private static final String HEALTH_CODE = "test-health-code";
-    private static final String HEALTH_ID = "test-health-id";
-    private static final String STUDY_ID = "test-study";
+    public static final String EMAIL = "test@example.com";
+    public static final String HEALTH_CODE = "test-health-code";
+    public static final String HEALTH_ID = "test-health-id";
+    public static final String STUDY_ID = "test-study";
 
     // non-mock test objects - We break inside these objects to get data.
-    private static final AccountInfo ACCOUNT_INFO = new AccountInfo.Builder().withEmailAddress(EMAIL)
+    public static final AccountInfo ACCOUNT_INFO = new AccountInfo.Builder().withEmailAddress(EMAIL)
             .withHealthId(HEALTH_ID).withUsername(EMAIL).build();
 
     // test request
-    private static final String REQUEST_JSON_TEXT = "{\n" +
+    public static final String REQUEST_JSON_TEXT = "{\n" +
             "   \"studyId\":\"" + STUDY_ID +"\",\n" +
             "   \"username\":\"" + EMAIL + "\",\n" +
             "   \"startDate\":\"2015-03-09\",\n" +
             "   \"endDate\":\"2015-03-31\"\n" +
             "}";
 
-    private static final String INVALID_JSON_TEXT = "{\n" +
+    public static final String INVALID_JSON_TEXT = "{\n" +
             "   \"invalidType\":\"" + STUDY_ID +"\",\n" +
             "   \"username\":\"" + EMAIL + "\",\n" +
             "   \"startDate\":\"2015-03-09\",\n" +
@@ -65,8 +65,6 @@ public class BridgeUddProcessorTest {
 
     private JsonNode requestJson;
     private JsonNode invalidRequestJson;
-
-
 
     // test members
     private BridgeUddProcessor callback;

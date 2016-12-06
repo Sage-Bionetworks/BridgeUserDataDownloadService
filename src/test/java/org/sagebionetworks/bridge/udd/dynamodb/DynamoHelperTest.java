@@ -3,6 +3,7 @@ package org.sagebionetworks.bridge.udd.dynamodb;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -25,6 +26,20 @@ public class DynamoHelperTest {
             "       \"type\":\"STRING\"\n" +
             "   }\n" +
             "]";
+
+    @Test
+    public void testGetHealthCodeNoCode() {
+        // mock health ID table
+        Table mockHealthIdTable = mock(Table.class);
+        when(mockHealthIdTable.getItem("id", "test-health-id")).thenReturn(null);
+
+        // set up dynamo helper
+        DynamoHelper dynamoHelper = new DynamoHelper();
+        dynamoHelper.setDdbHealthIdTable(mockHealthIdTable);
+
+        // execute and validate
+        assertNull(dynamoHelper.getHealthCodeFromHealthId("test-health-id"));
+    }
 
     @Test
     public void testGetHealthCode() {
