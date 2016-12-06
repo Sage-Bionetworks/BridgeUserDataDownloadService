@@ -80,6 +80,9 @@ public class BridgeUddProcessor {
 
             AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
             String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
+            if (healthCode == null) {
+                throw new PollSqsWorkerBadRequestException("Health code not found for hash[username]=" + userHash);
+            }
             Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
             Set<String> surveyTableIdSet = dynamoHelper.getSynapseSurveyTablesForStudy(studyId);
             PresignedUrlInfo presignedUrlInfo = synapsePackager.packageSynapseData(synapseToSchemaMap,

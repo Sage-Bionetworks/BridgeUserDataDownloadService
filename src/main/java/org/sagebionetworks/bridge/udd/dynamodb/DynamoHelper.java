@@ -87,6 +87,9 @@ public class DynamoHelper {
     public String getHealthCodeFromHealthId(String healthId) {
         // convert healthId to healthCode
         Item healthIdItem = ddbHealthIdTable.getItem("id", healthId);
+        if (healthIdItem == null) {
+            return null;
+        }
         return healthIdItem.getString("code");
     }
 
