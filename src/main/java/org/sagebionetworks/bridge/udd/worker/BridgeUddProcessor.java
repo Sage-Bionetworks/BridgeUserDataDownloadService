@@ -7,15 +7,18 @@ import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Stopwatch;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import org.sagebionetworks.bridge.json.DefaultObjectMapper;
+import org.sagebionetworks.bridge.rest.exceptions.BridgeSDKException;
 import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
+import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
@@ -28,10 +31,17 @@ import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 public class BridgeUddProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(BridgeUddProcessor.class);
 
+    private BridgeHelper bridgeHelper;
     private DynamoHelper dynamoHelper;
     private SesHelper sesHelper;
     private StormpathHelper stormpathHelper;
     private SynapsePackager synapsePackager;
+
+    /** Bridge helper, used to call Bridge server to get account info, such as email address and health code. */
+    @Autowired
+    public final void setBridgeHelper(BridgeHelper bridgeHelper) {
+        this.bridgeHelper = bridgeHelper;
+    }
 
     /** Dynamo DB helper, used to get study info and uploads. */
     @Autowired
@@ -65,40 +75,57 @@ public class BridgeUddProcessor {
             throw new PollSqsWorkerBadRequestException("Error parsing request: " + ex.getMessage(), ex);
         }
 
+        String userId = request.getUserId();
         String username = request.getUsername();
-        int userHash = username.hashCode();
+        Integer userHash = username != null ? username.hashCode() : null;
         String studyId = request.getStudyId();
         String startDateStr = request.getStartDate().toString();
         String endDateStr = request.getEndDate().toString();
-        LOG.info("Received request for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
-                startDateStr + ",endDate=" + endDateStr);
+        LOG.info("Received request for userId=" + userId + ", hash[username]=" + userHash + ", study="
+                + studyId + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
 
         Stopwatch requestStopwatch = Stopwatch.createStarted();
         try {
             // We need the study, because accounts and data are partitioned on study.
             StudyInfo studyInfo = dynamoHelper.getStudy(studyId);
 
-            AccountInfo accountInfo = stormpathHelper.getAccount(studyInfo, username);
-            String healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
-            if (healthCode == null) {
-                throw new PollSqsWorkerBadRequestException("Health code not found for hash[username]=" + userHash);
+            AccountInfo accountInfo;
+            String healthCode;
+            if (StringUtils.isNotBlank(userId)) {
+                accountInfo = bridgeHelper.getAccountInfo(studyId, userId);
+                healthCode = accountInfo.getHealthCode();
+            } else {
+                accountInfo = stormpathHelper.getAccount(studyInfo, username);
+                healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
             }
+            if (healthCode == null) {
+                throw new PollSqsWorkerBadRequestException("Health code not found for account " +
+                        accountInfo.getLogId());
+            }
+
             Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
             Set<String> surveyTableIdSet = dynamoHelper.getSynapseSurveyTablesForStudy(studyId);
             PresignedUrlInfo presignedUrlInfo = synapsePackager.packageSynapseData(synapseToSchemaMap,
                     healthCode, request, surveyTableIdSet);
 
             if (presignedUrlInfo == null) {
-                LOG.info("No data for request for hash[username]=" + userHash + ", study=" + studyId +
+                LOG.info("No data for request for account " + accountInfo.getLogId() + ", study=" + studyId +
                         ", startDate=" + startDateStr + ",endDate=" + endDateStr);
                 sesHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);
             } else {
                 sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
             }
+        } catch (BridgeSDKException ex) {
+            int status = ex.getStatusCode();
+            if (status >= 400 && status < 500) {
+                throw new PollSqsWorkerBadRequestException(ex);
+            } else {
+                throw new RuntimeException(ex);
+            }
         } finally {
             LOG.info("Request took " + requestStopwatch.elapsed(TimeUnit.SECONDS) +
-                    " seconds for hash[username]=" + userHash + ", study=" + studyId + ", startDate=" +
-                    startDateStr + ",endDate=" + endDateStr);
+                    " seconds for userId=" + userId + ", hash[username]=" + userHash + ", study=" + studyId +
+                    ", startDate=" + startDateStr + ",endDate=" + endDateStr);
         }
     }
 }

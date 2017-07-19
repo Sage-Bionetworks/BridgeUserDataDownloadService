@@ -1,5 +1,6 @@
 package org.sagebionetworks.bridge.udd.worker;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.datatype.joda.deser.LocalDateDeserializer;
@@ -10,15 +11,18 @@ import org.sagebionetworks.bridge.json.LocalDateToStringSerializer;
 
 /** Represents a request to the Bridge User Data Download Service. */
 @JsonDeserialize(builder = BridgeUddRequest.Builder.class)
+@JsonInclude(JsonInclude.Include.NON_EMPTY)
 public class BridgeUddRequest {
     private final String studyId;
+    private final String userId;
     private final String username;
     private final LocalDate startDate;
     private final LocalDate endDate;
 
     /** Private constructor. To construct, use builder. */
-    private BridgeUddRequest(String studyId, String username, LocalDate startDate, LocalDate endDate) {
+    private BridgeUddRequest(String studyId, String userId, String username, LocalDate startDate, LocalDate endDate) {
         this.studyId = studyId;
+        this.userId = userId;
         this.username = username;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -27,6 +31,11 @@ public class BridgeUddRequest {
     /** ID of the study to get user data from. */
     public String getStudyId() {
         return studyId;
+    }
+
+    /** ID of the user requesting their data. */
+    public String getUserId() {
+        return userId;
     }
 
     /** Username of the user requesting their data. */
@@ -49,6 +58,7 @@ public class BridgeUddRequest {
     /** Bridge-UDD request builder. */
     public static class Builder {
         private String studyId;
+        private String userId;
         private String username;
         private LocalDate startDate;
         private LocalDate endDate;
@@ -56,6 +66,12 @@ public class BridgeUddRequest {
         /** @see BridgeUddRequest#getStudyId */
         public Builder withStudyId(String studyId) {
             this.studyId = studyId;
+            return this;
+        }
+
+        /** @see BridgeUddRequest#getUserId */
+        public Builder withUserId(String userId) {
+            this.userId = userId;
             return this;
         }
 
@@ -88,8 +104,8 @@ public class BridgeUddRequest {
                 throw new IllegalStateException("studyId must be specified");
             }
 
-            if (Strings.isNullOrEmpty(username)) {
-                throw new IllegalStateException("username must be specified");
+            if (Strings.isNullOrEmpty(userId) && Strings.isNullOrEmpty(username)) {
+                throw new IllegalStateException("either userId or username must be specified");
             }
 
             if (startDate == null) {
@@ -104,7 +120,7 @@ public class BridgeUddRequest {
                 throw new IllegalStateException("startDate can't be after endDate");
             }
 
-            return new BridgeUddRequest(studyId, username, startDate, endDate);
+            return new BridgeUddRequest(studyId, userId, username, startDate, endDate);
         }
     }
 }

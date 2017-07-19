@@ -19,8 +19,6 @@ import com.stormpath.sdk.client.Client;
 import com.stormpath.sdk.client.Clients;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
-import org.sagebionetworks.client.SynapseAdminClientImpl;
-import org.sagebionetworks.client.SynapseClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +27,9 @@ import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
 import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
 import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
+import org.sagebionetworks.bridge.rest.ClientManager;
+import org.sagebionetworks.bridge.rest.model.ClientInfo;
+import org.sagebionetworks.bridge.rest.model.SignIn;
 import org.sagebionetworks.bridge.s3.S3Helper;
 
 // These configs get credentials from the default credential chain. For developer desktops, this is ~/.aws/credentials.
@@ -41,6 +42,18 @@ public class SpringConfig {
     private static final String CONFIG_FILE = "BridgeUserDataDownloadService.conf";
     private static final String DEFAULT_CONFIG_FILE = CONFIG_FILE;
     private static final String USER_CONFIG_FILE = System.getProperty("user.home") + "/" + CONFIG_FILE;
+
+    @Bean
+    public ClientManager bridgeClientManager() throws IOException {
+        Config config = bridgeConfig();
+        String study = config.get("bridge.worker.study");
+        String email = config.get("bridge.worker.email");
+        String password = config.get("bridge.worker.password");
+        SignIn bridgeCredentials = new SignIn().study(study).email(email).password(password);
+
+        ClientInfo clientInfo = new ClientInfo().appName("BridgeUDD").appVersion(1);
+        return new ClientManager.Builder().withClientInfo(clientInfo).withSignIn(bridgeCredentials).build();
+    }
 
     @Bean(name = "uddConfigProperties")
     public Config bridgeConfig() {
