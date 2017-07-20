@@ -4,6 +4,7 @@ import static org.testng.Assert.assertEquals;
 
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.joda.time.LocalDate;
 import org.testng.annotations.Test;
 
@@ -76,6 +77,16 @@ public class BridgeUddRequestTest {
     }
 
     @Test
+    public void withUserId() {
+        BridgeUddRequest request = new BridgeUddRequest.Builder().withStudyId("test-study").withUserId("test-user-id")
+                .withStartDate(LocalDate.parse("2015-08-15")).withEndDate(LocalDate.parse("2015-08-19")).build();
+        assertEquals(request.getStudyId(), "test-study");
+        assertEquals(request.getUserId(), "test-user-id");
+        assertEquals(request.getStartDate().toString(), "2015-08-15");
+        assertEquals(request.getEndDate().toString(), "2015-08-19");
+    }
+
+    @Test
     public void jsonSerialization() throws Exception {
         // start with JSON
         String jsonText = "{\n" +
@@ -102,5 +113,31 @@ public class BridgeUddRequestTest {
         assertEquals(jsonMap.get("username"), "json-user");
         assertEquals(jsonMap.get("startDate"), "2015-08-03");
         assertEquals(jsonMap.get("endDate"), "2015-08-07");
+    }
+
+    @Test
+    public void jsonSerializationWithUserId() throws Exception {
+        // start with JSON
+        String jsonText = "{\n" +
+                "   \"studyId\":\"json-study\",\n" +
+                "   \"userId\":\"json-user-id\",\n" +
+                "   \"startDate\":\"2015-08-03\",\n" +
+                "   \"endDate\":\"2015-08-07\"\n" +
+                "}";
+
+        // convert to POJO
+        BridgeUddRequest request = DefaultObjectMapper.INSTANCE.readValue(jsonText, BridgeUddRequest.class);
+        assertEquals(request.getStudyId(), "json-study");
+        assertEquals(request.getUserId(), "json-user-id");
+        assertEquals(request.getStartDate().toString(), "2015-08-03");
+        assertEquals(request.getEndDate().toString(), "2015-08-07");
+
+        // convert back to JSON
+        JsonNode jsonNode = DefaultObjectMapper.INSTANCE.convertValue(request, JsonNode.class);
+        assertEquals(4, jsonNode.size());
+        assertEquals(jsonNode.get("studyId").textValue(), "json-study");
+        assertEquals(jsonNode.get("userId").textValue(), "json-user-id");
+        assertEquals(jsonNode.get("startDate").textValue(), "2015-08-03");
+        assertEquals(jsonNode.get("endDate").textValue(), "2015-08-07");
     }
 }

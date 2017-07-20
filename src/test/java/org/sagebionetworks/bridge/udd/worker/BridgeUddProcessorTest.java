@@ -4,8 +4,10 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -20,9 +22,12 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import org.sagebionetworks.bridge.rest.exceptions.BridgeSDKException;
+import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
+import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
 import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
@@ -30,6 +35,7 @@ import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
+@SuppressWarnings("unchecked")
 public class BridgeUddProcessorTest {
     // mock objects - These are used only as passthroughs between the sub-components. So just create mocks instead
     // of instantiating all the fields.
@@ -42,16 +48,26 @@ public class BridgeUddProcessorTest {
     public static final String EMAIL = "test@example.com";
     public static final String HEALTH_CODE = "test-health-code";
     public static final String HEALTH_ID = "test-health-id";
+    public static final String USER_ID = "test-user-id";
     public static final String STUDY_ID = "test-study";
 
     // non-mock test objects - We break inside these objects to get data.
     public static final AccountInfo ACCOUNT_INFO = new AccountInfo.Builder().withEmailAddress(EMAIL)
             .withHealthId(HEALTH_ID).withUsername(EMAIL).build();
+    public static final AccountInfo USER_ID_ACCOUNT_INFO = new AccountInfo.Builder().withEmailAddress(EMAIL)
+            .withHealthCode(HEALTH_CODE).withUserId(USER_ID).build();
 
     // test request
     public static final String REQUEST_JSON_TEXT = "{\n" +
             "   \"studyId\":\"" + STUDY_ID +"\",\n" +
             "   \"username\":\"" + EMAIL + "\",\n" +
+            "   \"startDate\":\"2015-03-09\",\n" +
+            "   \"endDate\":\"2015-03-31\"\n" +
+            "}";
+
+    public static final String USER_ID_REQUEST_JSON_TEXT = "{\n" +
+            "   \"studyId\":\"" + STUDY_ID +"\",\n" +
+            "   \"userId\":\"" + USER_ID + "\",\n" +
             "   \"startDate\":\"2015-03-09\",\n" +
             "   \"endDate\":\"2015-03-31\"\n" +
             "}";
@@ -64,30 +80,39 @@ public class BridgeUddProcessorTest {
             "}";
 
     private JsonNode requestJson;
+    private JsonNode userIdRequestJson;
     private JsonNode invalidRequestJson;
 
     // test members
     private BridgeUddProcessor callback;
+    private BridgeHelper mockBridgeHelper;
+    private DynamoHelper mockDynamoHelper;
     private SynapsePackager mockPackager;
     private SesHelper mockSesHelper;
+    private StormpathHelper mockStormpathHelper;
 
     @BeforeClass
     public void generalSetup() throws IOException{
-        requestJson = DefaultObjectMapper.INSTANCE.readValue(REQUEST_JSON_TEXT, JsonNode.class);
-        invalidRequestJson = DefaultObjectMapper.INSTANCE.readValue(INVALID_JSON_TEXT, JsonNode.class);
+        requestJson = DefaultObjectMapper.INSTANCE.readTree(REQUEST_JSON_TEXT);
+        userIdRequestJson = DefaultObjectMapper.INSTANCE.readTree(USER_ID_REQUEST_JSON_TEXT);
+        invalidRequestJson = DefaultObjectMapper.INSTANCE.readTree(INVALID_JSON_TEXT);
     }
 
     @BeforeMethod
     public void setup() throws Exception {
+        // mock BridgeHelper
+        mockBridgeHelper = mock(BridgeHelper.class);
+        when(mockBridgeHelper.getAccountInfo(STUDY_ID, USER_ID)).thenReturn(USER_ID_ACCOUNT_INFO);
+
         // mock dynamo helper
-        DynamoHelper mockDynamoHelper = mock(DynamoHelper.class);
+        mockDynamoHelper = mock(DynamoHelper.class);
         when(mockDynamoHelper.getStudy(STUDY_ID)).thenReturn(MOCK_STUDY_INFO);
         when(mockDynamoHelper.getHealthCodeFromHealthId(HEALTH_ID)).thenReturn(HEALTH_CODE);
         when(mockDynamoHelper.getSynapseTableIdsForStudy(STUDY_ID)).thenReturn(MOCK_SYNAPSE_TO_SCHEMA);
         when(mockDynamoHelper.getSynapseSurveyTablesForStudy(STUDY_ID)).thenReturn(MOCK_SURVEY_TABLE_ID_SET);
 
         // mock stormpath helper
-        StormpathHelper mockStormpathHelper = mock(StormpathHelper.class);
+        mockStormpathHelper = mock(StormpathHelper.class);
         when(mockStormpathHelper.getAccount(same(MOCK_STUDY_INFO), eq(EMAIL))).thenReturn(ACCOUNT_INFO);
 
         // mock SES helper
@@ -98,6 +123,7 @@ public class BridgeUddProcessorTest {
 
         // set up callback
         callback = new BridgeUddProcessor();
+        callback.setBridgeHelper(mockBridgeHelper);
         callback.setDynamoHelper(mockDynamoHelper);
         callback.setSesHelper(mockSesHelper);
         callback.setStormpathHelper(mockStormpathHelper);
@@ -106,35 +132,76 @@ public class BridgeUddProcessorTest {
 
     @Test
     public void noData() throws Exception {
-        // set up packager call
-        when(mockPackager.packageSynapseData(same(MOCK_SYNAPSE_TO_SCHEMA), eq(HEALTH_CODE),
-                any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(null);
-
-        // execute
+        mockPackagerWithResult(null);
         callback.process(requestJson);
-
-        // verify SesHelper calls
-        verify(mockSesHelper).sendNoDataMessageToAccount(same(MOCK_STUDY_INFO), same(ACCOUNT_INFO));
-        verifyNoMoreInteractions(mockSesHelper);
+        verifySesNoData();
+        verifyStormpathAccount();
     }
 
     @Test
     public void sendPresignedUrl() throws Exception {
-        // set up packager call
-        when(mockPackager.packageSynapseData(same(MOCK_SYNAPSE_TO_SCHEMA), eq(HEALTH_CODE),
-                any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(MOCK_PRESIGNED_URL_INFO);
-
-        // execute
+        mockPackagerWithResult(MOCK_PRESIGNED_URL_INFO);
         callback.process(requestJson);
+        verifySesSendsData(ACCOUNT_INFO);
+        verifyStormpathAccount();
+    }
 
-        // verify SesHelper calls
-        verify(mockSesHelper).sendPresignedUrlToAccount(same(MOCK_STUDY_INFO), same(MOCK_PRESIGNED_URL_INFO),
-                same(ACCOUNT_INFO));
-        verifyNoMoreInteractions(mockSesHelper);
+    @Test
+    public void byUserId() throws Exception {
+        mockPackagerWithResult(MOCK_PRESIGNED_URL_INFO);
+        callback.process(userIdRequestJson);
+        verifySesSendsData(USER_ID_ACCOUNT_INFO);
+        verifyBridgeAccount();
+    }
+
+    @Test(expectedExceptions = PollSqsWorkerBadRequestException.class)
+    public void byUserIdBadRequest() throws Exception {
+        // Note: We need to manuall instantiate the exception. Otherwise, mock does something funky and bypasses the
+        // constructor that sets the status code.
+        when(mockBridgeHelper.getAccountInfo(STUDY_ID, USER_ID)).thenThrow(new EntityNotFoundException(
+                "text exception", null));
+        callback.process(userIdRequestJson);
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void byUserIdBridgeInternalError() throws Exception {
+        // Note: We need to manuall instantiate the exception. Otherwise, mock does something funky and bypasses the
+        // constructor that sets the status code.
+        when(mockBridgeHelper.getAccountInfo(STUDY_ID, USER_ID)).thenThrow(new BridgeSDKException("test exception",
+                null));
+        callback.process(userIdRequestJson);
     }
 
     @Test(expectedExceptions = PollSqsWorkerBadRequestException.class)
     public void malformedRequest() throws Exception {
         callback.process(invalidRequestJson);
+    }
+
+    private void mockPackagerWithResult(PresignedUrlInfo presignedUrlInfo) throws Exception {
+        when(mockPackager.packageSynapseData(same(MOCK_SYNAPSE_TO_SCHEMA), eq(HEALTH_CODE),
+                any(BridgeUddRequest.class), same(MOCK_SURVEY_TABLE_ID_SET))).thenReturn(presignedUrlInfo);
+    }
+
+    private void verifySesNoData() {
+        verify(mockSesHelper).sendNoDataMessageToAccount(same(MOCK_STUDY_INFO), same(ACCOUNT_INFO));
+        verifyNoMoreInteractions(mockSesHelper);
+    }
+
+    private void verifySesSendsData(AccountInfo expectedAccountInfo) {
+        verify(mockSesHelper).sendPresignedUrlToAccount(same(MOCK_STUDY_INFO), same(MOCK_PRESIGNED_URL_INFO),
+                same(expectedAccountInfo));
+        verifyNoMoreInteractions(mockSesHelper);
+    }
+
+    private void verifyStormpathAccount() throws Exception {
+        verifyZeroInteractions(mockBridgeHelper);
+        verify(mockStormpathHelper).getAccount(MOCK_STUDY_INFO, EMAIL);
+        verify(mockDynamoHelper).getHealthCodeFromHealthId(HEALTH_ID);
+    }
+
+    private void verifyBridgeAccount() throws Exception {
+        verify(mockBridgeHelper).getAccountInfo(STUDY_ID, USER_ID);
+        verifyZeroInteractions(mockStormpathHelper);
+        verify(mockDynamoHelper, never()).getHealthCodeFromHealthId(HEALTH_ID);
     }
 }
