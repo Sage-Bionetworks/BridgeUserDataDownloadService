@@ -117,7 +117,7 @@ public class SesHelper {
         SendEmailRequest sendEmailRequest = new SendEmailRequest(fromAddress, destination, message);
         SendEmailResult sendEmailResult = sesClient.sendEmail(sendEmailRequest);
 
-        LOG.info("Sent email to account " + accountInfo.getLogId() + " with SES message ID " +
+        LOG.info("Sent email to account " + accountInfo.getUserId() + " with SES message ID " +
                 sendEmailResult.getMessageId());
     }
 }

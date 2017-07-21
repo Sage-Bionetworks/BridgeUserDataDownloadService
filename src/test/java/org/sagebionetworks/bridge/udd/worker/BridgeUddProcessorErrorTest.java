@@ -1,7 +1,5 @@
 package org.sagebionetworks.bridge.udd.worker;
 
-import static org.mockito.Matchers.eq;
-import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -15,7 +13,7 @@ import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
-import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
+import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
@@ -25,7 +23,7 @@ public class BridgeUddProcessorErrorTest {
 
     @BeforeClass
     public void generalSetup() throws IOException {
-        requestJson = DefaultObjectMapper.INSTANCE.readValue(BridgeUddProcessorTest.REQUEST_JSON_TEXT, JsonNode.class);
+        requestJson = DefaultObjectMapper.INSTANCE.readTree(BridgeUddProcessorTest.USER_ID_REQUEST_JSON_TEXT);
     }
 
     @Test
@@ -34,12 +32,11 @@ public class BridgeUddProcessorErrorTest {
         DynamoHelper mockDynamoHelper = mock(DynamoHelper.class);
         when(mockDynamoHelper.getStudy(BridgeUddProcessorTest.STUDY_ID)).thenReturn(
                 BridgeUddProcessorTest.MOCK_STUDY_INFO);
-        when(mockDynamoHelper.getHealthCodeFromHealthId(BridgeUddProcessorTest.HEALTH_ID)).thenReturn(null);
 
-        // mock stormpath helper
-        StormpathHelper mockStormpathHelper = mock(StormpathHelper.class);
-        when(mockStormpathHelper.getAccount(same(BridgeUddProcessorTest.MOCK_STUDY_INFO),
-                eq(BridgeUddProcessorTest.EMAIL))).thenReturn(BridgeUddProcessorTest.ACCOUNT_INFO);
+        // mock bridge helper
+        BridgeHelper mockBridgeHelper = mock(BridgeHelper.class);
+        when(mockBridgeHelper.getAccountInfo(BridgeUddProcessorTest.STUDY_ID, BridgeUddProcessorTest.USER_ID))
+                .thenReturn(BridgeUddProcessorTest.ACCOUNT_INFO_NO_HEALTH_CODE);
 
         // mock SES helper
         SesHelper mockSesHelper = mock(SesHelper.class);
@@ -49,9 +46,9 @@ public class BridgeUddProcessorErrorTest {
 
         // set up callback
         BridgeUddProcessor callback = new BridgeUddProcessor();
+        callback.setBridgeHelper(mockBridgeHelper);
         callback.setDynamoHelper(mockDynamoHelper);
         callback.setSesHelper(mockSesHelper);
-        callback.setStormpathHelper(mockStormpathHelper);
         callback.setSynapsePackager(mockPackager);
 
         // execute

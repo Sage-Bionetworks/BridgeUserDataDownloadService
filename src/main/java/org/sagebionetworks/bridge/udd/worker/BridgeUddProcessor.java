@@ -7,7 +7,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Stopwatch;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +18,6 @@ import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
 import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
-import org.sagebionetworks.bridge.udd.accounts.StormpathHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
@@ -34,7 +32,6 @@ public class BridgeUddProcessor {
     private BridgeHelper bridgeHelper;
     private DynamoHelper dynamoHelper;
     private SesHelper sesHelper;
-    private StormpathHelper stormpathHelper;
     private SynapsePackager synapsePackager;
 
     /** Bridge helper, used to call Bridge server to get account info, such as email address and health code. */
@@ -55,12 +52,6 @@ public class BridgeUddProcessor {
         this.sesHelper = sesHelper;
     }
 
-    /** Stormpath helper. Used to get the email address and health ID (and indirectly, health code) for a user. */
-    @Autowired
-    public final void setStormpathHelper(StormpathHelper stormpathHelper) {
-        this.stormpathHelper = stormpathHelper;
-    }
-
     /** Synapse packager. Used to query Synapse and package the results in an S3 pre-signed URL. */
     @Autowired
     public final void setSynapsePackager(SynapsePackager synapsePackager) {
@@ -76,12 +67,10 @@ public class BridgeUddProcessor {
         }
 
         String userId = request.getUserId();
-        String username = request.getUsername();
-        Integer userHash = username != null ? username.hashCode() : null;
         String studyId = request.getStudyId();
         String startDateStr = request.getStartDate().toString();
         String endDateStr = request.getEndDate().toString();
-        LOG.info("Received request for userId=" + userId + ", hash[username]=" + userHash + ", study="
+        LOG.info("Received request for userId=" + userId + ", study="
                 + studyId + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
 
         Stopwatch requestStopwatch = Stopwatch.createStarted();
@@ -89,18 +78,11 @@ public class BridgeUddProcessor {
             // We need the study, because accounts and data are partitioned on study.
             StudyInfo studyInfo = dynamoHelper.getStudy(studyId);
 
-            AccountInfo accountInfo;
-            String healthCode;
-            if (StringUtils.isNotBlank(userId)) {
-                accountInfo = bridgeHelper.getAccountInfo(studyId, userId);
-                healthCode = accountInfo.getHealthCode();
-            } else {
-                accountInfo = stormpathHelper.getAccount(studyInfo, username);
-                healthCode = dynamoHelper.getHealthCodeFromHealthId(accountInfo.getHealthId());
-            }
+            AccountInfo accountInfo = bridgeHelper.getAccountInfo(studyId, userId);
+            String healthCode = accountInfo.getHealthCode();
             if (healthCode == null) {
                 throw new PollSqsWorkerBadRequestException("Health code not found for account " +
-                        accountInfo.getLogId());
+                        accountInfo.getUserId());
             }
 
             Map<String, UploadSchema> synapseToSchemaMap = dynamoHelper.getSynapseTableIdsForStudy(studyId);
@@ -109,7 +91,7 @@ public class BridgeUddProcessor {
                     healthCode, request, surveyTableIdSet);
 
             if (presignedUrlInfo == null) {
-                LOG.info("No data for request for account " + accountInfo.getLogId() + ", study=" + studyId +
+                LOG.info("No data for request for account " + accountInfo.getUserId() + ", study=" + studyId +
                         ", startDate=" + startDateStr + ",endDate=" + endDateStr);
                 sesHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);
             } else {
@@ -124,7 +106,7 @@ public class BridgeUddProcessor {
             }
         } finally {
             LOG.info("Request took " + requestStopwatch.elapsed(TimeUnit.SECONDS) +
-                    " seconds for userId=" + userId + ", hash[username]=" + userHash + ", study=" + studyId +
+                    " seconds for userId=" + userId + ", study=" + studyId +
                     ", startDate=" + startDateStr + ",endDate=" + endDateStr);
         }
     }

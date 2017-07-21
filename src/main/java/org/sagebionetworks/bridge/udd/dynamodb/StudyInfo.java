@@ -6,14 +6,12 @@ import com.google.common.base.Strings;
 public class StudyInfo {
     private final String name;
     private final String studyId;
-    private final String stormpathHref;
     private final String supportEmail;
 
     /** Private constructor. To construct, use builder. */
-    private StudyInfo(String name, String studyId, String stormpathHref, String supportEmail) {
+    private StudyInfo(String name, String studyId, String supportEmail) {
         this.name = name;
         this.studyId = studyId;
-        this.stormpathHref = stormpathHref;
         this.supportEmail = supportEmail;
     }
 
@@ -27,11 +25,6 @@ public class StudyInfo {
         return studyId;
     }
 
-    /** URL to access Stormpath (auth provider) partition. */
-    public String getStormpathHref() {
-        return stormpathHref;
-    }
-
     /** Email address that emails should be sent from. */
     public String getSupportEmail() {
         return supportEmail;
@@ -41,7 +34,6 @@ public class StudyInfo {
     public static class Builder {
         private String name;
         private String studyId;
-        private String stormpathHref;
         private String supportEmail;
 
         /** @see StudyInfo#getName */
@@ -53,12 +45,6 @@ public class StudyInfo {
         /** @see StudyInfo#getStudyId */
         public Builder withStudyId(String studyId) {
             this.studyId = studyId;
-            return this;
-        }
-
-        /** @see StudyInfo#getStormpathHref */
-        public Builder withStormpathHref(String stormpathHref) {
-            this.stormpathHref = stormpathHref;
             return this;
         }
 
@@ -78,15 +64,11 @@ public class StudyInfo {
                 throw new IllegalStateException("studyId must be specified");
             }
 
-            if (Strings.isNullOrEmpty(stormpathHref)) {
-                throw new IllegalStateException("stormpathHref must be specified");
-            }
-
             if (Strings.isNullOrEmpty(supportEmail)) {
                 throw new IllegalStateException("supportEmail must be specified");
             }
 
-            return new StudyInfo(name, studyId, stormpathHref, supportEmail);
+            return new StudyInfo(name, studyId, supportEmail);
         }
     }
 }

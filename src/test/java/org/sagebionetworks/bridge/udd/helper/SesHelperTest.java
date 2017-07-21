@@ -44,9 +44,9 @@ public class SesHelperTest {
 
         // set up common inputs
         studyInfo = new StudyInfo.Builder().withName("Test Study").withStudyId("test-study")
-                .withStormpathHref("dummy-stormpath-href").withSupportEmail("support@sagebase.org").build();
+                .withSupportEmail("support@sagebase.org").build();
         accountInfo = new AccountInfo.Builder().withEmailAddress("dummy-email@example.com")
-                .withHealthId("dummy-health-id").withUsername("dummy-username").build();
+                .withHealthCode("dummy-health-code").withUserId("dummy-user-id").build();
     }
 
     @Test

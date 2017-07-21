@@ -61,7 +61,7 @@ public class SynapsePackagerTest {
 
     // study and username don't matter for this class, only start date and end date
     private static final BridgeUddRequest TEST_UDD_REQUEST = new BridgeUddRequest.Builder().withStudyId("dummy-study")
-            .withUsername("dummy-user").withStartDate(LocalDate.parse(TEST_START_DATE))
+            .withUserId("dummy-user").withStartDate(LocalDate.parse(TEST_START_DATE))
             .withEndDate(LocalDate.parse(TEST_END_DATE)).build();
 
     private S3Helper mockS3Helper;
