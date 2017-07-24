@@ -23,19 +23,12 @@ import org.sagebionetworks.bridge.schema.UploadSchema;
 /** Helper class to wrap some Dynamo DB queries we make. */
 @Component("uddDynamoHelper")
 public class DynamoHelper {
-    private Table ddbHealthIdTable;
     private Table ddbStudyTable;
     private Table ddbSynapseMapTable;
     private Table ddbSynapseSurveyTablesTable;
     private Table ddbUploadSchemaTable;
     private Index ddbUploadSchemaStudyIndex;
     private DynamoQueryHelper queryHelper;
-
-    /** Health ID table. */
-    @Resource(name = "ddbHealthIdTable")
-    public final void setDdbHealthIdTable(Table ddbHealthIdTable) {
-        this.ddbHealthIdTable = ddbHealthIdTable;
-    }
 
     /** Study table. */
     @Resource(name = "ddbStudyTable")
@@ -78,22 +71,6 @@ public class DynamoHelper {
     }
 
     /**
-     * Gets the user's health code from their health ID.
-     *
-     * @param healthId
-     *         user's health ID
-     * @return user's health code
-     */
-    public String getHealthCodeFromHealthId(String healthId) {
-        // convert healthId to healthCode
-        Item healthIdItem = ddbHealthIdTable.getItem("id", healthId);
-        if (healthIdItem == null) {
-            return null;
-        }
-        return healthIdItem.getString("code");
-    }
-
-    /**
      * Gets study info for the given study ID.
      *
      * @param studyId
@@ -104,10 +81,9 @@ public class DynamoHelper {
         Item study = ddbStudyTable.getItem("identifier", studyId);
 
         String studyName = study.getString("name");
-        String stormpathHref = study.getString("stormpathHref");
         String supportEmail = study.getString("supportEmail");
 
-        return new StudyInfo.Builder().withName(studyName).withStudyId(studyId).withStormpathHref(stormpathHref)
+        return new StudyInfo.Builder().withName(studyName).withStudyId(studyId)
                 .withSupportEmail(supportEmail).build();
     }
 

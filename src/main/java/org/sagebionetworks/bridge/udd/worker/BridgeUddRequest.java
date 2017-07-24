@@ -15,15 +15,13 @@ import org.sagebionetworks.bridge.json.LocalDateToStringSerializer;
 public class BridgeUddRequest {
     private final String studyId;
     private final String userId;
-    private final String username;
     private final LocalDate startDate;
     private final LocalDate endDate;
 
     /** Private constructor. To construct, use builder. */
-    private BridgeUddRequest(String studyId, String userId, String username, LocalDate startDate, LocalDate endDate) {
+    private BridgeUddRequest(String studyId, String userId, LocalDate startDate, LocalDate endDate) {
         this.studyId = studyId;
         this.userId = userId;
-        this.username = username;
         this.startDate = startDate;
         this.endDate = endDate;
     }
@@ -36,11 +34,6 @@ public class BridgeUddRequest {
     /** ID of the user requesting their data. */
     public String getUserId() {
         return userId;
-    }
-
-    /** Username of the user requesting their data. */
-    public String getUsername() {
-        return username;
     }
 
     /** Start date (inclusive) of data to fetch. */
@@ -59,7 +52,6 @@ public class BridgeUddRequest {
     public static class Builder {
         private String studyId;
         private String userId;
-        private String username;
         private LocalDate startDate;
         private LocalDate endDate;
 
@@ -72,12 +64,6 @@ public class BridgeUddRequest {
         /** @see BridgeUddRequest#getUserId */
         public Builder withUserId(String userId) {
             this.userId = userId;
-            return this;
-        }
-
-        /** @see BridgeUddRequest#getUsername */
-        public Builder withUsername(String username) {
-            this.username = username;
             return this;
         }
 
@@ -104,8 +90,8 @@ public class BridgeUddRequest {
                 throw new IllegalStateException("studyId must be specified");
             }
 
-            if (Strings.isNullOrEmpty(userId) && Strings.isNullOrEmpty(username)) {
-                throw new IllegalStateException("either userId or username must be specified");
+            if (Strings.isNullOrEmpty(userId)) {
+                throw new IllegalStateException("userId must be specified");
             }
 
             if (startDate == null) {
@@ -120,7 +106,7 @@ public class BridgeUddRequest {
                 throw new IllegalStateException("startDate can't be after endDate");
             }
 
-            return new BridgeUddRequest(studyId, userId, username, startDate, endDate);
+            return new BridgeUddRequest(studyId, userId, startDate, endDate);
         }
     }
 }

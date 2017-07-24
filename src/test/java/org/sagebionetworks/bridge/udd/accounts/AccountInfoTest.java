@@ -1,68 +1,55 @@
 package org.sagebionetworks.bridge.udd.accounts;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertNull;
 
 import org.testng.annotations.Test;
 
 public class AccountInfoTest {
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*emailAddress.*")
+    private static final String EMAIL = "eggplant@example.com";
+    private static final String HEALTH_CODE = "dummy-health-code";
+    private static final String USER_ID = "dummy-user-id";
+
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
+            "emailAddress must be specified")
     public void nullEmailAddress() {
-        new AccountInfo.Builder().withHealthId("dummy-health-id").withUsername("dummy-username").build();
+        new AccountInfo.Builder().withHealthCode(HEALTH_CODE).withUserId(USER_ID).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*emailAddress.*")
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
+            "emailAddress must be specified")
     public void emptyEmailAddress() {
-        new AccountInfo.Builder().withEmailAddress("").withHealthId("dummy-health-id").withUsername("dummy-username")
+        new AccountInfo.Builder().withEmailAddress("").withHealthCode(HEALTH_CODE).withUserId(USER_ID)
                 .build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*healthId.*")
-    public void nullHealthId() {
-        new AccountInfo.Builder().withEmailAddress("dummy-email@example.com").withUsername("dummy-username").build();
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
+            "userId must be specified")
+    public void nullUserId() {
+        new AccountInfo.Builder().withEmailAddress(EMAIL).withHealthCode(HEALTH_CODE).build();
     }
 
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*healthId.*")
-    public void emptyHealthId() {
-        new AccountInfo.Builder().withEmailAddress("dummy-email@example.com").withHealthId("")
-                .withUsername("dummy-username").build();
-    }
-
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*username.*")
-    public void nullUsername() {
-        new AccountInfo.Builder().withEmailAddress("dummy-email@example.com").withHealthId("dummy-health-id").build();
-    }
-
-    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*username.*")
-    public void emptyUsername() {
-        new AccountInfo.Builder().withEmailAddress("dummy-email@example.com").withHealthId("dummy-health-id")
-                .withUsername("").build();
-    }
-
-    @Test
-    public void healthIdAndUsername() {
-        AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress("dummy-email@example.com")
-                .withHealthId("dummy-health-id").withUsername("dummy-username").build();
-        assertEquals(accountInfo.getEmailAddress(), "dummy-email@example.com");
-        assertEquals(accountInfo.getHealthId(), "dummy-health-id");
-        assertEquals(accountInfo.getUsername(), "dummy-username");
-
-        // log ID contains a hash of the username (and the prefix "hash[username]="), but not the username itself
-        String logId = accountInfo.getLogId();
-        assertTrue(logId.startsWith("hash[username]="));
-        assertFalse(logId.contains("dummy-username"));
+    @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
+            "userId must be specified")
+    public void emptyUserId() {
+        new AccountInfo.Builder().withEmailAddress(EMAIL).withHealthCode(HEALTH_CODE)
+                .withUserId("").build();
     }
 
     @Test
     public void healthCodeAndUserId() {
-        AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress("dummy-email@example.com")
-                .withHealthCode("dummy-health-code").withUserId("dummy-user-id").build();
-        assertEquals(accountInfo.getEmailAddress(), "dummy-email@example.com");
-        assertEquals(accountInfo.getHealthCode(), "dummy-health-code");
-        assertEquals(accountInfo.getUserId(), "dummy-user-id");
+        AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress(EMAIL).withHealthCode(HEALTH_CODE)
+                .withUserId(USER_ID).build();
+        assertEquals(accountInfo.getEmailAddress(), EMAIL);
+        assertEquals(accountInfo.getHealthCode(), HEALTH_CODE);
+        assertEquals(accountInfo.getUserId(), USER_ID);
+    }
 
-        // log ID is just user ID
-        assertEquals(accountInfo.getLogId(), accountInfo.getUserId());
+    @Test
+    public void nullHealthCodeOkay() {
+        AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress(EMAIL).withUserId(USER_ID).build();
+        assertEquals(accountInfo.getEmailAddress(), EMAIL);
+        assertNull(accountInfo.getHealthCode());
+        assertEquals(accountInfo.getUserId(), USER_ID);
     }
 }

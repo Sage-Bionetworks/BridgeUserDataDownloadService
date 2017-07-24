@@ -3,7 +3,6 @@ package org.sagebionetworks.bridge.udd.dynamodb;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -28,38 +27,9 @@ public class DynamoHelperTest {
             "]";
 
     @Test
-    public void testGetHealthCodeNoCode() {
-        // mock health ID table
-        Table mockHealthIdTable = mock(Table.class);
-        when(mockHealthIdTable.getItem("id", "test-health-id")).thenReturn(null);
-
-        // set up dynamo helper
-        DynamoHelper dynamoHelper = new DynamoHelper();
-        dynamoHelper.setDdbHealthIdTable(mockHealthIdTable);
-
-        // execute and validate
-        assertNull(dynamoHelper.getHealthCodeFromHealthId("test-health-id"));
-    }
-
-    @Test
-    public void testGetHealthCode() {
-        // mock health ID table
-        Item mockItem = new Item().withString("code", "test-health-code");
-        Table mockHealthIdTable = mock(Table.class);
-        when(mockHealthIdTable.getItem("id", "test-health-id")).thenReturn(mockItem);
-
-        // set up dynamo helper
-        DynamoHelper dynamoHelper = new DynamoHelper();
-        dynamoHelper.setDdbHealthIdTable(mockHealthIdTable);
-
-        // execute and validate
-        assertEquals(dynamoHelper.getHealthCodeFromHealthId("test-health-id"), "test-health-code");
-    }
-
-    @Test
     public void testGetStudy() {
         // mock study table
-        Item mockItem = new Item().withString("name", "Test Study").withString("stormpathHref", "dummy-stormpath-href")
+        Item mockItem = new Item().withString("name", "Test Study")
                 .withString("supportEmail", "support@sagebase.org");
         Table mockStudyTable = mock(Table.class);
         when(mockStudyTable.getItem("identifier", "test-study")).thenReturn(mockItem);
@@ -72,7 +42,6 @@ public class DynamoHelperTest {
         StudyInfo studyInfo = dynamoHelper.getStudy("test-study");
         assertEquals(studyInfo.getStudyId(), "test-study");
         assertEquals(studyInfo.getName(), "Test Study");
-        assertEquals(studyInfo.getStormpathHref(), "dummy-stormpath-href");
         assertEquals(studyInfo.getSupportEmail(), "support@sagebase.org");
     }
 

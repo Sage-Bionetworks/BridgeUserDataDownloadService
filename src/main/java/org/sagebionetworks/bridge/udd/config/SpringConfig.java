@@ -13,18 +13,12 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
-import com.stormpath.sdk.api.ApiKey;
-import com.stormpath.sdk.api.ApiKeys;
-import com.stormpath.sdk.client.Client;
-import com.stormpath.sdk.client.Clients;
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
-import org.sagebionetworks.bridge.crypto.AesGcmEncryptor;
-import org.sagebionetworks.bridge.crypto.Encryptor;
 import org.sagebionetworks.bridge.dynamodb.DynamoQueryHelper;
 import org.sagebionetworks.bridge.heartbeat.HeartbeatLogger;
 import org.sagebionetworks.bridge.rest.ClientManager;
@@ -88,11 +82,6 @@ public class SpringConfig {
         return new DynamoDB(new AmazonDynamoDBClient());
     }
 
-    @Bean(name = "ddbHealthIdTable")
-    public Table ddbHealthIdTable() {
-        return ddbClient().getTable(ddbPrefix() + "HealthId");
-    }
-
     @Bean
     public DynamoQueryHelper ddbQueryHelper() {
         return new DynamoQueryHelper();
@@ -125,14 +114,6 @@ public class SpringConfig {
         return ddbUploadSchemaTable().getIndex("studyId-index");
     }
 
-    @Bean(name = "healthCodeEncryptor")
-    public Encryptor healthCodeEncryptor() {
-        // TODO: BridgePF supports multiple versions of this. However, this will require a code change anyway. We need
-        // to refactor these into a shared library anyway, so for the initial investment, do something quick and dirty
-        // until we have the resources to do the refactor properly.
-        return new AesGcmEncryptor(bridgeConfig().get("health.code.key"));
-    }
-
     @Bean
     public HeartbeatLogger heartbeatLogger() throws IOException {
         HeartbeatLogger heartbeatLogger = new HeartbeatLogger();
@@ -150,12 +131,5 @@ public class SpringConfig {
     @Bean
     public AmazonSimpleEmailServiceClient sesClient() {
         return new AmazonSimpleEmailServiceClient();
-    }
-
-    @Bean(name="uddStompath")
-    public Client stormpathClient() throws IOException {
-        ApiKey apiKey = ApiKeys.builder().setId(bridgeConfig().get("stormpath.id"))
-                .setSecret(bridgeConfig().get("stormpath.secret")).build();
-        return Clients.builder().setApiKey(apiKey).setBaseUrl("https://enterprise.stormpath.io/v1").build();
     }
 }
