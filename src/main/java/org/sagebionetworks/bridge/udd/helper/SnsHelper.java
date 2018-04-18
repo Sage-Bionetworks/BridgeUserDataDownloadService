@@ -41,13 +41,15 @@ public class SnsHelper {
     }
     
     public void sendNoDataMessageToAccount(StudyInfo studyInfo, AccountInfo accountInfo) {
-        String body = String.format(NO_DATA_MESSAGE_TEMPLATE, studyInfo.getName());
+        String name = (studyInfo.getShortName() != null) ? studyInfo.getShortName() : studyInfo.getName();
+        String body = String.format(NO_DATA_MESSAGE_TEMPLATE, name);
         sendSmsToAccount(studyInfo, accountInfo, body);
     }
     
     public void sendPresignedUrlToAccount(StudyInfo studyInfo, PresignedUrlInfo presignedUrlInfo,
             AccountInfo accountInfo) {
-        String body = String.format(MESSAGE_TEMPLATE, studyInfo.getName(), presignedUrlInfo.getUrl().toString());
+        String name = (studyInfo.getShortName() != null) ? studyInfo.getShortName() : studyInfo.getName();
+        String body = String.format(MESSAGE_TEMPLATE, name, presignedUrlInfo.getUrl().toString());
         sendSmsToAccount(studyInfo, accountInfo, body);
     }
     
