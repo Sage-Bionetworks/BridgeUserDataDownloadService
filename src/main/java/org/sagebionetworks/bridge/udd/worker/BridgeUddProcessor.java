@@ -21,6 +21,7 @@ import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
+import org.sagebionetworks.bridge.udd.helper.SnsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
@@ -31,6 +32,7 @@ public class BridgeUddProcessor {
 
     private BridgeHelper bridgeHelper;
     private DynamoHelper dynamoHelper;
+    private SnsHelper snsHelper;
     private SesHelper sesHelper;
     private SynapsePackager synapsePackager;
 
@@ -50,6 +52,12 @@ public class BridgeUddProcessor {
     @Autowired
     public final void setSesHelper(SesHelper sesHelper) {
         this.sesHelper = sesHelper;
+    }
+    
+    /** SNS helper, used to send a message to the requesting user. */
+    @Autowired
+    public final void setSnsHelper(SnsHelper snsHelper) {
+        this.snsHelper = snsHelper;
     }
 
     /** Synapse packager. Used to query Synapse and package the results in an S3 pre-signed URL. */
@@ -91,11 +99,19 @@ public class BridgeUddProcessor {
                     healthCode, request, surveyTableIdSet);
 
             if (presignedUrlInfo == null) {
-                LOG.info("No data for request for account " + accountInfo.getUserId() + ", study=" + studyId +
-                        ", startDate=" + startDateStr + ",endDate=" + endDateStr);
-                sesHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);
+                LOG.info("No data for request for account " + accountInfo.getUserId() + ", study=" + studyId
+                        + ", startDate=" + startDateStr + ",endDate=" + endDateStr);
+                if (accountInfo.getEmailAddress() != null) {
+                    sesHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);    
+                } else if (accountInfo.getPhone() != null) {
+                    snsHelper.sendNoDataMessageToAccount(studyInfo, accountInfo);
+                }
             } else {
-                sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
+                if (accountInfo.getEmailAddress() != null) {
+                    sesHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);    
+                } else if (accountInfo.getPhone() != null) {
+                    snsHelper.sendPresignedUrlToAccount(studyInfo, presignedUrlInfo, accountInfo);
+                }
             }
         } catch (BridgeSDKException ex) {
             int status = ex.getStatusCode();

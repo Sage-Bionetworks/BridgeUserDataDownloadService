@@ -24,7 +24,13 @@ public class BridgeHelper {
     public AccountInfo getAccountInfo(String studyId, String userId) throws IOException {
         StudyParticipant participant = bridgeClientManager.getClient(ForWorkersApi.class).getParticipantInStudy(
                 studyId, userId).execute().body();
-        return new AccountInfo.Builder().withEmailAddress(participant.getEmail())
-                .withHealthCode(participant.getHealthCode()).withUserId(userId).build();
+        AccountInfo.Builder builder = new AccountInfo.Builder().withHealthCode(participant.getHealthCode())
+                .withUserId(userId);
+        if (participant.getEmail() != null && participant.getEmailVerified() == Boolean.TRUE) {
+            builder.withEmailAddress(participant.getEmail());
+        } else if (participant.getPhone() != null && participant.getPhoneVerified() == Boolean.TRUE) {
+            builder.withPhone(participant.getPhone());
+        }
+        return builder.build();
     }
 }

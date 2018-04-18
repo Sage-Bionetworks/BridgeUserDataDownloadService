@@ -4,6 +4,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -22,6 +23,7 @@ import org.testng.annotations.Test;
 
 import org.sagebionetworks.bridge.rest.exceptions.BridgeSDKException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
+import org.sagebionetworks.bridge.rest.model.Phone;
 import org.sagebionetworks.bridge.schema.UploadSchema;
 import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 import org.sagebionetworks.bridge.udd.accounts.AccountInfo;
@@ -29,6 +31,7 @@ import org.sagebionetworks.bridge.udd.accounts.BridgeHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.DynamoHelper;
 import org.sagebionetworks.bridge.udd.dynamodb.StudyInfo;
 import org.sagebionetworks.bridge.udd.helper.SesHelper;
+import org.sagebionetworks.bridge.udd.helper.SnsHelper;
 import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.sagebionetworks.bridge.udd.synapse.SynapsePackager;
 
@@ -76,6 +79,7 @@ public class BridgeUddProcessorTest {
     private BridgeHelper mockBridgeHelper;
     private SynapsePackager mockPackager;
     private SesHelper mockSesHelper;
+    private SnsHelper mockSnsHelper;
 
     @BeforeClass
     public void generalSetup() throws IOException{
@@ -98,6 +102,9 @@ public class BridgeUddProcessorTest {
         // mock SES helper
         mockSesHelper = mock(SesHelper.class);
 
+        // mock SNS helper
+        mockSnsHelper = mock(SnsHelper.class);
+        
         // mock Synapse packager
         mockPackager = mock(SynapsePackager.class);
 
@@ -106,6 +113,7 @@ public class BridgeUddProcessorTest {
         callback.setBridgeHelper(mockBridgeHelper);
         callback.setDynamoHelper(mockDynamoHelper);
         callback.setSesHelper(mockSesHelper);
+        callback.setSnsHelper(mockSnsHelper);
         callback.setSynapsePackager(mockPackager);
     }
 
@@ -146,6 +154,23 @@ public class BridgeUddProcessorTest {
     @Test(expectedExceptions = PollSqsWorkerBadRequestException.class)
     public void malformedRequest() throws Exception {
         callback.process(invalidRequestJson);
+    }
+    
+    @Test
+    public void userWithPhoneNumber() throws Exception { 
+        Phone phone = new Phone().regionCode("US").number("4082588569");
+        
+        AccountInfo accountInfo = new AccountInfo.Builder().withHealthCode(HEALTH_CODE).withUserId(USER_ID)
+                .withPhone(phone).build();
+        when(mockBridgeHelper.getAccountInfo(STUDY_ID, USER_ID)).thenReturn(accountInfo);
+        
+        mockPackagerWithResult(MOCK_PRESIGNED_URL_INFO);
+        callback.process(userIdRequestJson);
+        verify(mockSnsHelper).sendPresignedUrlToAccount(same(MOCK_STUDY_INFO), same(MOCK_PRESIGNED_URL_INFO),
+                same(accountInfo));
+        verifyNoMoreInteractions(mockSnsHelper);
+        verifyNoMoreInteractions(mockSesHelper);
+        verify(mockBridgeHelper).getAccountInfo(STUDY_ID, USER_ID);
     }
 
     private void mockPackagerWithResult(PresignedUrlInfo presignedUrlInfo) throws Exception {

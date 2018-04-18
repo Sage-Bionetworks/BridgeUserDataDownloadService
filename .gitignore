@@ -2,6 +2,9 @@
 .idea
 *.iml
 target
+.classpath
+.project
+test-output/
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*

@@ -43,9 +43,10 @@ public class StudyInfoTest {
 
     @Test
     public void happyCase() {
-        StudyInfo studyInfo = new StudyInfo.Builder().withName("Test Study").withStudyId("test-study")
-                .withSupportEmail("support@sagebase.org").build();
+        StudyInfo studyInfo = new StudyInfo.Builder().withName("Test Study").withShortName("Test")
+                .withStudyId("test-study").withSupportEmail("support@sagebase.org").build();
         assertEquals(studyInfo.getName(), "Test Study");
+        assertEquals(studyInfo.getShortName(), "Test");
         assertEquals(studyInfo.getStudyId(), "test-study");
         assertEquals(studyInfo.getSupportEmail(), "support@sagebase.org");
     }

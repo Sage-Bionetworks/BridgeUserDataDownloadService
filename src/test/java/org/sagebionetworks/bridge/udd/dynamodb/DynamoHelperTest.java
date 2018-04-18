@@ -30,7 +30,7 @@ public class DynamoHelperTest {
     public void testGetStudy() {
         // mock study table
         Item mockItem = new Item().withString("name", "Test Study")
-                .withString("supportEmail", "support@sagebase.org");
+                .withString("shortName", "Test").withString("supportEmail", "support@sagebase.org");
         Table mockStudyTable = mock(Table.class);
         when(mockStudyTable.getItem("identifier", "test-study")).thenReturn(mockItem);
 
@@ -41,6 +41,7 @@ public class DynamoHelperTest {
         // execute and validate
         StudyInfo studyInfo = dynamoHelper.getStudy("test-study");
         assertEquals(studyInfo.getStudyId(), "test-study");
+        assertEquals(studyInfo.getShortName(), "Test");
         assertEquals(studyInfo.getName(), "Test Study");
         assertEquals(studyInfo.getSupportEmail(), "support@sagebase.org");
     }

@@ -3,6 +3,7 @@ package org.sagebionetworks.bridge.udd.accounts;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
+import org.sagebionetworks.bridge.rest.model.Phone;
 import org.testng.annotations.Test;
 
 public class AccountInfoTest {
@@ -11,13 +12,13 @@ public class AccountInfoTest {
     private static final String USER_ID = "dummy-user-id";
 
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
-            "emailAddress must be specified")
+            "emailAddress or phone must be specified")
     public void nullEmailAddress() {
         new AccountInfo.Builder().withHealthCode(HEALTH_CODE).withUserId(USER_ID).build();
     }
 
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp =
-            "emailAddress must be specified")
+            "emailAddress or phone must be specified")
     public void emptyEmailAddress() {
         new AccountInfo.Builder().withEmailAddress("").withHealthCode(HEALTH_CODE).withUserId(USER_ID)
                 .build();
@@ -50,6 +51,14 @@ public class AccountInfoTest {
         AccountInfo accountInfo = new AccountInfo.Builder().withEmailAddress(EMAIL).withUserId(USER_ID).build();
         assertEquals(accountInfo.getEmailAddress(), EMAIL);
         assertNull(accountInfo.getHealthCode());
+        assertEquals(accountInfo.getUserId(), USER_ID);
+    }
+    
+    @Test
+    public void phoneOnlyOkay() {
+        Phone phone = new Phone().regionCode("US").number("4082588569");
+        AccountInfo accountInfo = new AccountInfo.Builder().withPhone(phone).withUserId(USER_ID).build();
+        assertEquals(accountInfo.getPhone(), phone);
         assertEquals(accountInfo.getUserId(), USER_ID);
     }
 }
