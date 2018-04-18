@@ -42,7 +42,7 @@ public class SnsHelperTest {
         snsHelper.setSnsClient(mockSnsClient);
 
         // set up common inputs
-        studyInfo = new StudyInfo.Builder().withShortName("Test").withName("Test Study").withStudyId("test-study")
+        studyInfo = new StudyInfo.Builder().withShortName("Short").withName("Test Study").withStudyId("test-study")
                 .withSupportEmail("support@sagebase.org").build();
         accountInfo = new AccountInfo.Builder().withPhone(PHONE)
                 .withHealthCode("dummy-health-code").withUserId("dummy-user-id").build();
@@ -73,7 +73,22 @@ public class SnsHelperTest {
         String message = validateMessageAndExtractBody();
         assertTrue(message.contains(dummyPresignedUrl));
     }
+    
+    @Test
+    public void useShortNameWhenPresent() {
+        // The default studyInfo object has a shortName, so that's what we should get back.
+        assertEquals("Short", snsHelper.getStudyName(studyInfo));
+    }
+    
+    @Test
+    public void useLongNameWhenPresent() {
+        // This object does not have a short name, so we use the fuller name
+        studyInfo = new StudyInfo.Builder().withName("Test Study").withStudyId("test-study")
+                .withSupportEmail("support@sagebase.org").build();
 
+        assertEquals("Test Study", snsHelper.getStudyName(studyInfo));
+    }
+    
     private String validateMessageAndExtractBody() {
         PublishRequest publishRequest = publishRequestCaptor.getValue();
         assertEquals(publishRequest.getPhoneNumber(), PHONE.getNumber());

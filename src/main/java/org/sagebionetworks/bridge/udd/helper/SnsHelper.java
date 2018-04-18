@@ -41,15 +41,13 @@ public class SnsHelper {
     }
     
     public void sendNoDataMessageToAccount(StudyInfo studyInfo, AccountInfo accountInfo) {
-        String name = (studyInfo.getShortName() != null) ? studyInfo.getShortName() : studyInfo.getName();
-        String body = String.format(NO_DATA_MESSAGE_TEMPLATE, name);
+        String body = String.format(NO_DATA_MESSAGE_TEMPLATE, getStudyName(studyInfo));
         sendSmsToAccount(studyInfo, accountInfo, body);
     }
     
     public void sendPresignedUrlToAccount(StudyInfo studyInfo, PresignedUrlInfo presignedUrlInfo,
             AccountInfo accountInfo) {
-        String name = (studyInfo.getShortName() != null) ? studyInfo.getShortName() : studyInfo.getName();
-        String body = String.format(MESSAGE_TEMPLATE, name, presignedUrlInfo.getUrl().toString());
+        String body = String.format(MESSAGE_TEMPLATE, getStudyName(studyInfo), presignedUrlInfo.getUrl().toString());
         sendSmsToAccount(studyInfo, accountInfo, body);
     }
     
@@ -66,7 +64,11 @@ public class SnsHelper {
         PublishResult result = snsClient.publish(request);
         
         LOG.info("Sent SMS to account " + accountInfo.getUserId() + " with SNS message ID " + result.getMessageId());
-    }  
+    }
+    
+    protected String getStudyName(StudyInfo studyInfo) {
+        return (studyInfo.getShortName() != null) ? studyInfo.getShortName() : studyInfo.getName();   
+    }
     
     private MessageAttributeValue attribute(String value) {
         return new MessageAttributeValue().withStringValue(value).withDataType("String");
