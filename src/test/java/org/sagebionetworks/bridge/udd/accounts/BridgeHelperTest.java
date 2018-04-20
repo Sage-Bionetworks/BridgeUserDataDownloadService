@@ -13,6 +13,7 @@ import org.sagebionetworks.bridge.rest.ClientManager;
 import org.sagebionetworks.bridge.rest.api.ForWorkersApi;
 import org.sagebionetworks.bridge.rest.model.Phone;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
+import org.sagebionetworks.bridge.sqs.PollSqsWorkerBadRequestException;
 
 @SuppressWarnings("unchecked")
 public class BridgeHelperTest {
@@ -81,5 +82,32 @@ public class BridgeHelperTest {
         assertEquals(accountInfo.getPhone(), PHONE);
         assertEquals(accountInfo.getHealthCode(), HEALTH_CODE);
         assertEquals(accountInfo.getUserId(), USER_ID);
+    }
+    
+    @Test(expectedExceptions = PollSqsWorkerBadRequestException.class, expectedExceptionsMessageRegExp =
+            "User does not have validated email address or phone number.")
+    public void getAccountInfoThrowsWithNoVerifiedIdentifier() throws Exception {
+        StudyParticipant mockParticipant = mock(StudyParticipant.class);
+        when(mockParticipant.getEmail()).thenReturn(EMAIL);
+        when(mockParticipant.getEmailVerified()).thenReturn(Boolean.FALSE);
+        when(mockParticipant.getPhone()).thenReturn(PHONE);
+        when(mockParticipant.getPhoneVerified()).thenReturn(null);
+        when(mockParticipant.getHealthCode()).thenReturn(HEALTH_CODE);
+
+        // mock bridge calls
+        Response<StudyParticipant> response = Response.success(mockParticipant);
+        Call<StudyParticipant> mockCall = mock(Call.class);
+        when(mockCall.execute()).thenReturn(response);
+
+        ForWorkersApi mockWorkerApi = mock(ForWorkersApi.class);
+        when(mockWorkerApi.getParticipantInStudy(STUDY_ID, USER_ID)).thenReturn(mockCall);
+
+        ClientManager mockClientManager = mock(ClientManager.class);
+        when(mockClientManager.getClient(ForWorkersApi.class)).thenReturn(mockWorkerApi);
+
+        BridgeHelper bridgeHelper = new BridgeHelper();
+        bridgeHelper.setBridgeClientManager(mockClientManager);
+        
+        bridgeHelper.getAccountInfo(STUDY_ID, USER_ID);
     }
 }

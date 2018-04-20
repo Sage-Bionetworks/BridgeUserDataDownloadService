@@ -4,6 +4,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.same;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -170,6 +171,23 @@ public class BridgeUddProcessorTest {
         verifyNoMoreInteractions(mockSnsHelper);
         verifyNoMoreInteractions(mockSesHelper);
         verify(mockBridgeHelper).getAccountInfo(STUDY_ID, USER_ID);
+    }
+    
+    @Test
+    public void userWithPhoneNumberNoData() throws Exception {
+        Phone phone = new Phone().regionCode("US").number("4082588569");
+        
+        AccountInfo accountInfo = new AccountInfo.Builder().withHealthCode(HEALTH_CODE).withUserId(USER_ID)
+                .withPhone(phone).build();
+        when(mockBridgeHelper.getAccountInfo(STUDY_ID, USER_ID)).thenReturn(accountInfo);
+        
+        mockPackagerWithResult(null);
+        callback.process(userIdRequestJson);
+        
+        verify(mockSnsHelper).sendNoDataMessageToAccount(same(MOCK_STUDY_INFO), same(accountInfo));
+        verifyNoMoreInteractions(mockSnsHelper);
+        verifyNoMoreInteractions(mockSesHelper);
+        verify(mockBridgeHelper).getAccountInfo(STUDY_ID, USER_ID);        
     }
 
     private void mockPackagerWithResult(PresignedUrlInfo presignedUrlInfo) throws Exception {
