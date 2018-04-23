@@ -28,9 +28,9 @@ public class BridgeHelper {
                 studyId, userId).execute().body();
         AccountInfo.Builder builder = new AccountInfo.Builder().withHealthCode(participant.getHealthCode())
                 .withUserId(userId);
-        if (participant.getEmail() != null && participant.getEmailVerified() == Boolean.TRUE) {
+        if (participant.getEmail() != null && Boolean.TRUE.equals(participant.getEmailVerified())) {
             builder.withEmailAddress(participant.getEmail());
-        } else if (participant.getPhone() != null && participant.getPhoneVerified() == Boolean.TRUE) {
+        } else if (participant.getPhone() != null && Boolean.TRUE.equals(participant.getPhoneVerified())) {
             builder.withPhone(participant.getPhone());
         } else {
             throw new PollSqsWorkerBadRequestException("User does not have validated email address or phone number.");
