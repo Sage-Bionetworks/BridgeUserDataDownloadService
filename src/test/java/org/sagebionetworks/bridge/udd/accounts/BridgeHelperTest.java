@@ -88,8 +88,9 @@ public class BridgeHelperTest {
             "User does not have validated email address or phone number.")
     public void getAccountInfoThrowsWithNoVerifiedIdentifier() throws Exception {
         StudyParticipant mockParticipant = mock(StudyParticipant.class);
-        when(mockParticipant.getEmail()).thenReturn(EMAIL);
-        when(mockParticipant.getEmailVerified()).thenReturn(Boolean.FALSE);
+        // Verify that null is also acceptable (and false)
+        when(mockParticipant.getEmail()).thenReturn(null);
+        when(mockParticipant.getEmailVerified()).thenReturn(null);
         when(mockParticipant.getPhone()).thenReturn(PHONE);
         when(mockParticipant.getPhoneVerified()).thenReturn(null);
         when(mockParticipant.getHealthCode()).thenReturn(HEALTH_CODE);
