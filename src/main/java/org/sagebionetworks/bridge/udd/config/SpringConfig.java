@@ -13,6 +13,8 @@ import com.amazonaws.services.dynamodbv2.document.Index;
 import com.amazonaws.services.dynamodbv2.document.Table;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.simpleemail.AmazonSimpleEmailServiceClient;
+import com.amazonaws.services.sns.AmazonSNSClient;
+
 import org.sagebionetworks.bridge.config.Config;
 import org.sagebionetworks.bridge.config.PropertiesConfig;
 import org.springframework.context.annotation.Bean;
@@ -132,4 +134,10 @@ public class SpringConfig {
     public AmazonSimpleEmailServiceClient sesClient() {
         return new AmazonSimpleEmailServiceClient();
     }
+    
+    @Bean
+    public AmazonSNSClient snsClient() {
+        return new AmazonSNSClient();
+    }
+    
 }

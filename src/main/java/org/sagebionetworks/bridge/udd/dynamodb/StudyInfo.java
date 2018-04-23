@@ -5,12 +5,14 @@ import com.google.common.base.Strings;
 /** Encapsulates metadata for a study. */
 public class StudyInfo {
     private final String name;
+    private final String shortName;
     private final String studyId;
     private final String supportEmail;
 
     /** Private constructor. To construct, use builder. */
-    private StudyInfo(String name, String studyId, String supportEmail) {
+    private StudyInfo(String name, String shortName, String studyId, String supportEmail) {
         this.name = name;
+        this.shortName = shortName;
         this.studyId = studyId;
         this.supportEmail = supportEmail;
     }
@@ -18,6 +20,11 @@ public class StudyInfo {
     /** Study name. */
     public String getName() {
         return name;
+    }
+    
+    /** Study's short (SMS appropriate) name. */
+    public String getShortName() {
+        return shortName;
     }
 
     /** Study ID. */
@@ -33,12 +40,18 @@ public class StudyInfo {
     /** StudyInfo builder. */
     public static class Builder {
         private String name;
+        private String shortName;
         private String studyId;
         private String supportEmail;
 
         /** @see StudyInfo#getName */
         public Builder withName(String name) {
             this.name = name;
+            return this;
+        }
+        
+        public Builder withShortName(String shortName) {
+            this.shortName = shortName;
             return this;
         }
 
@@ -68,7 +81,7 @@ public class StudyInfo {
                 throw new IllegalStateException("supportEmail must be specified");
             }
 
-            return new StudyInfo(name, studyId, supportEmail);
+            return new StudyInfo(name, shortName, studyId, supportEmail);
         }
     }
 }

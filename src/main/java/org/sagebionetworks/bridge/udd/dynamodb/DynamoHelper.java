@@ -81,9 +81,10 @@ public class DynamoHelper {
         Item study = ddbStudyTable.getItem("identifier", studyId);
 
         String studyName = study.getString("name");
+        String studyShortName = study.getString("shortName");
         String supportEmail = study.getString("supportEmail");
 
-        return new StudyInfo.Builder().withName(studyName).withStudyId(studyId)
+        return new StudyInfo.Builder().withName(studyName).withShortName(studyShortName).withStudyId(studyId)
                 .withSupportEmail(supportEmail).build();
     }
 
