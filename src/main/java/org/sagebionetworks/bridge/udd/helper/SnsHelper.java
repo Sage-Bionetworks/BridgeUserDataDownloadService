@@ -8,6 +8,7 @@ import org.sagebionetworks.bridge.udd.s3.PresignedUrlInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import com.amazonaws.services.sns.AmazonSNSClient;
 import com.amazonaws.services.sns.model.MessageAttributeValue;
@@ -15,6 +16,8 @@ import com.amazonaws.services.sns.model.PublishRequest;
 import com.amazonaws.services.sns.model.PublishResult;
 import com.google.common.collect.Maps;
 
+/** Helper class to format and send the presigned URL as a text through SMS. */
+@Component
 public class SnsHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SnsHelper.class);
     
