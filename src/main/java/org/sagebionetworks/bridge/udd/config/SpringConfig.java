@@ -42,10 +42,10 @@ public class SpringConfig {
     @Bean
     public ClientManager bridgeClientManager() throws IOException {
         Config config = bridgeConfig();
-        String study = config.get("bridge.worker.study");
+        String appId = config.get("bridge.worker.study");
         String email = config.get("bridge.worker.email");
         String password = config.get("bridge.worker.password");
-        SignIn bridgeCredentials = new SignIn().study(study).email(email).password(password);
+        SignIn bridgeCredentials = new SignIn().appId(appId).email(email).password(password);
 
         ClientInfo clientInfo = new ClientInfo().appName("BridgeUDD").appVersion(1);
         return new ClientManager.Builder().withClientInfo(clientInfo).withSignIn(bridgeCredentials).build();
