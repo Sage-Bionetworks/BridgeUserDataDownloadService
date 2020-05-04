@@ -91,11 +91,7 @@
         <dependency>
             <groupId>org.sagebionetworks.bridge</groupId>
             <artifactId>rest-client</artifactId>
-<<<<<<< HEAD
             <version>0.20.0</version>
-=======
-            <version>0.15.15</version>
->>>>>>> cddcb2edc55f23800e0753b4fd14e74ce5badab0
         </dependency>
 
         <dependency>
