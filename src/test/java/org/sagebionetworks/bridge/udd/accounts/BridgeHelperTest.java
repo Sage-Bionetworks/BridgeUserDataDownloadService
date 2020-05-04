@@ -28,7 +28,7 @@ public class BridgeHelperTest {
         // mock StudyParticipant - We can't set the healthcode, but we need to return it for test.
         StudyParticipant mockParticipant = mock(StudyParticipant.class);
         when(mockParticipant.getEmail()).thenReturn(EMAIL);
-        when(mockParticipant.getEmailVerified()).thenReturn(Boolean.TRUE);
+        when(mockParticipant.isEmailVerified()).thenReturn(Boolean.TRUE);
         when(mockParticipant.getHealthCode()).thenReturn(HEALTH_CODE);
 
         // mock bridge calls
@@ -37,7 +37,7 @@ public class BridgeHelperTest {
         when(mockCall.execute()).thenReturn(response);
 
         ForWorkersApi mockWorkerApi = mock(ForWorkersApi.class);
-        when(mockWorkerApi.getParticipantInStudy(STUDY_ID, USER_ID)).thenReturn(mockCall);
+        when(mockWorkerApi.getParticipantByIdForApp(STUDY_ID, USER_ID, false)).thenReturn(mockCall);
 
         ClientManager mockClientManager = mock(ClientManager.class);
         when(mockClientManager.getClient(ForWorkersApi.class)).thenReturn(mockWorkerApi);
@@ -57,9 +57,9 @@ public class BridgeHelperTest {
         // mock StudyParticipant - We can't set the healthcode, but we need to return it for test.
         StudyParticipant mockParticipant = mock(StudyParticipant.class);
         when(mockParticipant.getEmail()).thenReturn(EMAIL);
-        when(mockParticipant.getEmailVerified()).thenReturn(Boolean.FALSE);
+        when(mockParticipant.isEmailVerified()).thenReturn(Boolean.FALSE);
         when(mockParticipant.getPhone()).thenReturn(PHONE);
-        when(mockParticipant.getPhoneVerified()).thenReturn(Boolean.TRUE);
+        when(mockParticipant.isPhoneVerified()).thenReturn(Boolean.TRUE);
         when(mockParticipant.getHealthCode()).thenReturn(HEALTH_CODE);
 
         // mock bridge calls
@@ -68,7 +68,7 @@ public class BridgeHelperTest {
         when(mockCall.execute()).thenReturn(response);
 
         ForWorkersApi mockWorkerApi = mock(ForWorkersApi.class);
-        when(mockWorkerApi.getParticipantInStudy(STUDY_ID, USER_ID)).thenReturn(mockCall);
+        when(mockWorkerApi.getParticipantByIdForApp(STUDY_ID, USER_ID, false)).thenReturn(mockCall);
 
         ClientManager mockClientManager = mock(ClientManager.class);
         when(mockClientManager.getClient(ForWorkersApi.class)).thenReturn(mockWorkerApi);
@@ -89,9 +89,9 @@ public class BridgeHelperTest {
     public void getAccountInfoThrowsWithNoVerifiedIdentifier() throws Exception {
         StudyParticipant mockParticipant = mock(StudyParticipant.class);
         when(mockParticipant.getEmail()).thenReturn(EMAIL);
-        when(mockParticipant.getEmailVerified()).thenReturn(Boolean.FALSE);
+        when(mockParticipant.isEmailVerified()).thenReturn(Boolean.FALSE);
         when(mockParticipant.getPhone()).thenReturn(PHONE);
-        when(mockParticipant.getPhoneVerified()).thenReturn(null);
+        when(mockParticipant.isPhoneVerified()).thenReturn(null);
         when(mockParticipant.getHealthCode()).thenReturn(HEALTH_CODE);
 
         // mock bridge calls
@@ -100,7 +100,7 @@ public class BridgeHelperTest {
         when(mockCall.execute()).thenReturn(response);
 
         ForWorkersApi mockWorkerApi = mock(ForWorkersApi.class);
-        when(mockWorkerApi.getParticipantInStudy(STUDY_ID, USER_ID)).thenReturn(mockCall);
+        when(mockWorkerApi.getParticipantByIdForApp(STUDY_ID, USER_ID, false)).thenReturn(mockCall);
 
         ClientManager mockClientManager = mock(ClientManager.class);
         when(mockClientManager.getClient(ForWorkersApi.class)).thenReturn(mockWorkerApi);

@@ -24,13 +24,13 @@ public class BridgeHelper {
     /** Gets account information (email address, healthcode) for the given account ID. */
     public AccountInfo getAccountInfo(String studyId, String userId)
             throws IOException, PollSqsWorkerBadRequestException {
-        StudyParticipant participant = bridgeClientManager.getClient(ForWorkersApi.class).getParticipantInStudy(
-                studyId, userId).execute().body();
+        StudyParticipant participant = bridgeClientManager.getClient(ForWorkersApi.class).getParticipantByIdForApp(
+                studyId, userId, false).execute().body();
         AccountInfo.Builder builder = new AccountInfo.Builder().withHealthCode(participant.getHealthCode())
                 .withUserId(userId);
-        if (participant.getEmail() != null && participant.getEmailVerified() == Boolean.TRUE) {
+        if (participant.getEmail() != null && participant.isEmailVerified() == Boolean.TRUE) {
             builder.withEmailAddress(participant.getEmail());
-        } else if (participant.getPhone() != null && participant.getPhoneVerified() == Boolean.TRUE) {
+        } else if (participant.getPhone() != null && participant.isPhoneVerified() == Boolean.TRUE) {
             builder.withPhone(participant.getPhone());
         } else {
             throw new PollSqsWorkerBadRequestException("User does not have validated email address or phone number.");
